@@ -30,8 +30,8 @@ export default async function AdminDashboard() {
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
         <StatCard label="Total Companies" value={totalCompanies.toLocaleString()} />
-        <StatCard label="Total Orders" value={totalOrders.toLocaleString()} />
-        <StatCard label="Completed Sales" value={completedOrders.toLocaleString()} />
+        <StatCard label="Total Orders" value={totalOrders.toLocaleString()} href="/admin/orders" />
+        <StatCard label="Completed Sales" value={completedOrders.toLocaleString()} href="/admin/orders?status=completed" />
         <StatCard
           label="Total Revenue"
           value={`$${revenue.toLocaleString("en-US", { minimumFractionDigits: 2 })}`}
@@ -93,11 +93,15 @@ export default async function AdminDashboard() {
   );
 }
 
-function StatCard({ label, value }: { label: string; value: string }) {
-  return (
-    <Card>
+function StatCard({ label, value, href }: { label: string; value: string; href?: string }) {
+  const content = (
+    <Card className={href ? "hover:shadow-md transition cursor-pointer" : ""}>
       <p className="text-sm text-gray-500">{label}</p>
       <p className="text-2xl font-bold mt-1">{value}</p>
     </Card>
   );
+  if (href) {
+    return <a href={href}>{content}</a>;
+  }
+  return content;
 }

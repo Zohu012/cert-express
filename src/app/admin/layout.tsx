@@ -36,6 +36,12 @@ export default async function AdminLayout({
                 Companies
               </Link>
               <Link
+                href="/admin/orders"
+                className="text-gray-300 hover:text-white transition"
+              >
+                Orders
+              </Link>
+              <Link
                 href="/admin/emails"
                 className="text-gray-300 hover:text-white transition"
               >
