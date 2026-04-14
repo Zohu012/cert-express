@@ -1,0 +1,85 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model SourcePdf {
+  id           String    @id @default(uuid())
+  filename     String
+  issueDate    DateTime
+  downloadUrl  String?
+  status       String    @default("pending")
+  totalPages   Int       @default(0)
+  companyCount Int       @default(0)
+  error        String?
+  createdAt    DateTime  @default(now())
+  processedAt  DateTime?
+  companies    Company[]
+}
+
+model Company {
+  id             String    @id @default(uuid())
+  companyName    String
+  dbaName        String?
+  streetAddress  String?
+  city           String?
+  state          String?
+  zipCode        String?
+  usdotNumber    String
+  documentNumber String
+  documentType   String
+  serviceDate    DateTime
+  pdfFilename    String?
+  email          String?
+  emailSentAt    DateTime?
+  emailStatus    String?
+  sourcePdfId    String
+  sourcePdf      SourcePdf @relation(fields: [sourcePdfId], references: [id])
+  orders         Order[]
+  createdAt      DateTime  @default(now())
+
+  @@index([usdotNumber])
+  @@index([documentNumber])
+  @@index([companyName])
+  @@index([serviceDate])
+  @@index([emailStatus])
+}
+
+model Order {
+  id            String    @id @default(uuid())
+  companyId     String
+  company       Company   @relation(fields: [companyId], references: [id])
+  amount        Int
+  currency      String    @default("USD")
+  paymentMethod String
+  paymentId     String?
+  status        String    @default("pending")
+  customerEmail String?
+  downloadToken String    @unique @default(uuid())
+  downloadCount Int       @default(0)
+  maxDownloads  Int       @default(5)
+  expiresAt     DateTime
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([paymentId])
+  @@index([downloadToken])
+  @@index([status])
+}
+
+model Setting {
+  id    String @id @default(uuid())
+  key   String @unique
+  value String
+}
+
+model AdminUser {
+  id           String   @id @default(uuid())
+  username     String   @unique
+  passwordHash String
+  createdAt    DateTime @default(now())
+}
