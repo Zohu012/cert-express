@@ -10,14 +10,32 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const { id, email } = await req.json();
+  const body = await req.json();
+  const { id } = body;
 
-  await prisma.company.update({
-    where: { id },
-    data: { email },
-  });
+  if (!id) return NextResponse.json({ error: "Missing id" }, { status: 400 });
 
-  return NextResponse.json({ success: true });
+  // Build update payload — only include fields that were sent
+  const data: Record<string, unknown> = {};
+  if ("email" in body)         data.email         = body.email        || null;
+  if ("companyName" in body)   data.companyName   = body.companyName;
+  if ("dbaName" in body)       data.dbaName       = body.dbaName      || null;
+  if ("usdotNumber" in body)   data.usdotNumber   = body.usdotNumber;
+  if ("documentNumber" in body) data.documentNumber = body.documentNumber;
+  if ("documentType" in body)  data.documentType  = body.documentType;
+  if ("serviceDate" in body)   data.serviceDate   = new Date(body.serviceDate);
+  if ("streetAddress" in body) data.streetAddress = body.streetAddress || null;
+  if ("city" in body)          data.city          = body.city         || null;
+  if ("state" in body)         data.state         = body.state        || null;
+  if ("zipCode" in body)       data.zipCode       = body.zipCode      || null;
+
+  try {
+    const company = await prisma.company.update({ where: { id }, data });
+    return NextResponse.json({ success: true, company });
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : "Update failed";
+    return NextResponse.json({ error: msg }, { status: 500 });
+  }
 }
 
 export async function DELETE(req: NextRequest) {

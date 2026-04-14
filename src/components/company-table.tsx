@@ -11,8 +11,10 @@ interface Company {
   documentNumber: string;
   documentType: string;
   serviceDate: Date;
+  streetAddress: string | null;
   city: string | null;
   state: string | null;
+  zipCode: string | null;
   email: string | null;
   emailStatus: string | null;
   pdfFilename: string | null;
@@ -23,12 +25,100 @@ function formatDate(date: Date) {
   return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}-${String(d.getUTCDate()).padStart(2, "0")}`;
 }
 
+// ─── Edit form state ────────────────────────────────────────────────────────
+interface EditForm {
+  companyName: string;
+  dbaName: string;
+  usdotNumber: string;
+  documentNumber: string;
+  documentType: string;
+  serviceDate: string;   // YYYY-MM-DD
+  streetAddress: string;
+  city: string;
+  state: string;
+  zipCode: string;
+  email: string;
+}
+
+function companyToForm(c: Company): EditForm {
+  return {
+    companyName:    c.companyName,
+    dbaName:        c.dbaName        || "",
+    usdotNumber:    c.usdotNumber,
+    documentNumber: c.documentNumber,
+    documentType:   c.documentType,
+    serviceDate:    formatDate(c.serviceDate),
+    streetAddress:  c.streetAddress  || "",
+    city:           c.city           || "",
+    state:          c.state          || "",
+    zipCode:        c.zipCode        || "",
+    email:          c.email          || "",
+  };
+}
+
+// ─── CompanyTable ────────────────────────────────────────────────────────────
 export function CompanyTable({ companies }: { companies: Company[] }) {
   const router = useRouter();
   const [rows, setRows] = useState<Company[]>(companies);
-  const [deleteId, setDeleteId] = useState<string | null>(null);
-  const [deleting, setDeleting] = useState(false);
+
+  // Delete state
+  const [deleteId, setDeleteId]     = useState<string | null>(null);
+  const [deleting, setDeleting]     = useState(false);
   const [deleteError, setDeleteError] = useState("");
+
+  // Edit state
+  const [editingCompany, setEditingCompany] = useState<Company | null>(null);
+  const [editForm, setEditForm]     = useState<EditForm | null>(null);
+  const [saving, setSaving]         = useState(false);
+  const [editError, setEditError]   = useState("");
+
+  function openEdit(company: Company) {
+    setEditingCompany(company);
+    setEditForm(companyToForm(company));
+    setEditError("");
+  }
+
+  function updateField(key: keyof EditForm, value: string) {
+    setEditForm((prev) => prev ? { ...prev, [key]: value } : prev);
+  }
+
+  async function handleSave() {
+    if (!editingCompany || !editForm) return;
+    setSaving(true);
+    setEditError("");
+    try {
+      const res = await fetch("/api/admin/companies", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: editingCompany.id, ...editForm }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Save failed");
+
+      const updated: Company = {
+        ...editingCompany,
+        companyName:    editForm.companyName,
+        dbaName:        editForm.dbaName    || null,
+        usdotNumber:    editForm.usdotNumber,
+        documentNumber: editForm.documentNumber,
+        documentType:   editForm.documentType,
+        serviceDate:    new Date(editForm.serviceDate),
+        streetAddress:  editForm.streetAddress || null,
+        city:           editForm.city           || null,
+        state:          editForm.state          || null,
+        zipCode:        editForm.zipCode        || null,
+        email:          editForm.email          || null,
+      };
+      setRows((prev) => prev.map((r) => (r.id === updated.id ? updated : r)));
+      setEditingCompany(null);
+      setEditForm(null);
+      router.refresh();
+    } catch (e: unknown) {
+      setEditError(e instanceof Error ? e.message : "Unknown error");
+    } finally {
+      setSaving(false);
+    }
+  }
 
   async function handleDelete() {
     if (!deleteId) return;
@@ -74,6 +164,7 @@ export function CompanyTable({ companies }: { companies: Company[] }) {
               <CompanyRow
                 key={c.id}
                 company={c}
+                onEdit={openEdit}
                 onDelete={(id) => { setDeleteId(id); setDeleteError(""); }}
                 onUpdated={(updated) =>
                   setRows((prev) => prev.map((r) => (r.id === updated.id ? updated : r)))
@@ -87,7 +178,189 @@ export function CompanyTable({ companies }: { companies: Company[] }) {
         )}
       </div>
 
-      {/* Delete Confirm Modal */}
+      {/* ── Edit Modal ─────────────────────────────────────────────────────── */}
+      {editingCompany && editForm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+            <div className="sticky top-0 bg-white border-b px-6 py-4 flex items-center justify-between rounded-t-xl">
+              <h2 className="text-lg font-bold">Edit Company</h2>
+              <button
+                onClick={() => { setEditingCompany(null); setEditForm(null); }}
+                className="text-gray-400 hover:text-gray-600 text-xl leading-none"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="px-6 py-5 space-y-4">
+              {editError && (
+                <p className="text-sm text-red-600 bg-red-50 rounded px-3 py-2">
+                  {editError}
+                </p>
+              )}
+
+              {/* Company Name */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="sm:col-span-2">
+                  <label className="block text-xs font-medium text-gray-700 mb-1">
+                    Company Name <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    value={editForm.companyName}
+                    onChange={(e) => updateField("companyName", e.target.value)}
+                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                  />
+                </div>
+
+                <div className="sm:col-span-2">
+                  <label className="block text-xs font-medium text-gray-700 mb-1">
+                    DBA Name
+                  </label>
+                  <input
+                    value={editForm.dbaName}
+                    onChange={(e) => updateField("dbaName", e.target.value)}
+                    placeholder="Doing Business As…"
+                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                  />
+                </div>
+              </div>
+
+              {/* DOT + Doc */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">
+                    USDOT Number <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    value={editForm.usdotNumber}
+                    onChange={(e) => updateField("usdotNumber", e.target.value)}
+                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm font-mono"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">
+                    Document Number <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    value={editForm.documentNumber}
+                    onChange={(e) => updateField("documentNumber", e.target.value)}
+                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm font-mono"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">
+                    Document Type
+                  </label>
+                  <select
+                    value={editForm.documentType}
+                    onChange={(e) => updateField("documentType", e.target.value)}
+                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                  >
+                    <option value="CERTIFICATE">CERTIFICATE</option>
+                    <option value="PERMIT">PERMIT</option>
+                    <option value="LICENSE">LICENSE</option>
+                    <option value="OTHER">OTHER</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Service Date */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">
+                    Service Date
+                  </label>
+                  <input
+                    type="date"
+                    value={editForm.serviceDate}
+                    onChange={(e) => updateField("serviceDate", e.target.value)}
+                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">
+                    Email
+                  </label>
+                  <input
+                    type="email"
+                    value={editForm.email}
+                    onChange={(e) => updateField("email", e.target.value)}
+                    placeholder="company@example.com"
+                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                  />
+                </div>
+              </div>
+
+              {/* Address */}
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">
+                  Street Address
+                </label>
+                <input
+                  value={editForm.streetAddress}
+                  onChange={(e) => updateField("streetAddress", e.target.value)}
+                  placeholder="123 Main St"
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div className="col-span-2">
+                  <label className="block text-xs font-medium text-gray-700 mb-1">
+                    City
+                  </label>
+                  <input
+                    value={editForm.city}
+                    onChange={(e) => updateField("city", e.target.value)}
+                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">
+                    State
+                  </label>
+                  <input
+                    value={editForm.state}
+                    onChange={(e) => updateField("state", e.target.value)}
+                    maxLength={2}
+                    placeholder="TX"
+                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm uppercase"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">
+                    ZIP Code
+                  </label>
+                  <input
+                    value={editForm.zipCode}
+                    onChange={(e) => updateField("zipCode", e.target.value)}
+                    placeholder="12345"
+                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="sticky bottom-0 bg-gray-50 border-t px-6 py-4 flex justify-end gap-3 rounded-b-xl">
+              <button
+                onClick={() => { setEditingCompany(null); setEditForm(null); }}
+                className="rounded-lg border border-gray-300 px-4 py-2 text-sm hover:bg-gray-100"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSave}
+                disabled={saving || !editForm.companyName || !editForm.usdotNumber}
+                className="rounded-lg bg-blue-600 px-5 py-2 text-sm text-white hover:bg-blue-700 disabled:opacity-50"
+              >
+                {saving ? "Saving…" : "Save Changes"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Delete Confirm Modal ────────────────────────────────────────────── */}
       {deleteId && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
           <div className="bg-white rounded-xl shadow-xl w-full max-w-sm mx-4 p-6">
@@ -123,24 +396,27 @@ export function CompanyTable({ companies }: { companies: Company[] }) {
   );
 }
 
+// ─── CompanyRow ──────────────────────────────────────────────────────────────
 function CompanyRow({
   company,
+  onEdit,
   onDelete,
   onUpdated,
 }: {
   company: Company;
+  onEdit: (c: Company) => void;
   onDelete: (id: string) => void;
   onUpdated: (c: Company) => void;
 }) {
-  const [email, setEmail] = useState(company.email || "");
-  const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
-  const [sending, setSending] = useState(false);
+  const [email, setEmail]           = useState(company.email || "");
+  const [saving, setSaving]         = useState(false);
+  const [saved, setSaved]           = useState(false);
+  const [sending, setSending]       = useState(false);
   const [sendResult, setSendResult] = useState<string | null>(null);
   const [emailStatus, setEmailStatus] = useState(company.emailStatus);
-  const [uploading, setUploading] = useState(false);
-  const [uploadMsg, setUploadMsg] = useState<string | null>(null);
-  const [hasPdf, setHasPdf] = useState(!!company.pdfFilename);
+  const [uploading, setUploading]   = useState(false);
+  const [uploadMsg, setUploadMsg]   = useState<string | null>(null);
+  const [hasPdf, setHasPdf]         = useState(!!company.pdfFilename);
   const fileRef = useRef<HTMLInputElement>(null);
 
   async function saveEmail() {
@@ -211,14 +487,18 @@ function CompanyRow({
 
   return (
     <tr className="border-b last:border-0 hover:bg-gray-50">
+      {/* Company name */}
       <td className="px-4 py-2">
         <div className="font-medium">{company.companyName}</div>
         {company.dbaName && (
           <div className="text-xs text-gray-400">D/B/A {company.dbaName}</div>
         )}
       </td>
+
       <td className="px-4 py-2">{company.usdotNumber}</td>
       <td className="px-4 py-2 font-mono text-xs">{company.documentNumber}</td>
+
+      {/* Type badge */}
       <td className="px-4 py-2">
         <span
           className={`px-2 py-0.5 rounded-full text-xs font-medium ${
@@ -232,12 +512,11 @@ function CompanyRow({
           {company.documentType}
         </span>
       </td>
-      <td className="px-4 py-2 text-gray-600">{formatDate(company.serviceDate)}</td>
-      <td className="px-4 py-2 text-gray-600">
-        {company.city}, {company.state}
-      </td>
 
-      {/* Email column */}
+      <td className="px-4 py-2 text-gray-600">{formatDate(company.serviceDate)}</td>
+      <td className="px-4 py-2 text-gray-600">{company.city}, {company.state}</td>
+
+      {/* Email */}
       <td className="px-4 py-2">
         <div className="flex items-center gap-1">
           <input
@@ -278,7 +557,7 @@ function CompanyRow({
         )}
       </td>
 
-      {/* PDF column — View via authenticated API route */}
+      {/* PDF */}
       <td className="px-4 py-2">
         <div className="flex flex-col gap-1">
           {hasPdf ? (
@@ -293,7 +572,6 @@ function CompanyRow({
           ) : (
             <span className="text-gray-400 text-xs">No PDF</span>
           )}
-          {/* Reupload */}
           <label
             className={`text-xs cursor-pointer px-2 py-0.5 rounded border text-center ${
               uploading
@@ -315,14 +593,22 @@ function CompanyRow({
         </div>
       </td>
 
-      {/* Actions column */}
+      {/* Actions */}
       <td className="px-4 py-2">
-        <button
-          onClick={() => onDelete(company.id)}
-          className="text-xs px-2 py-1 rounded bg-red-50 text-red-700 border border-red-200 hover:bg-red-100"
-        >
-          Delete
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={() => onEdit(company)}
+            className="text-xs px-2 py-1 rounded bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100"
+          >
+            Edit
+          </button>
+          <button
+            onClick={() => onDelete(company.id)}
+            className="text-xs px-2 py-1 rounded bg-red-50 text-red-700 border border-red-200 hover:bg-red-100"
+          >
+            Delete
+          </button>
+        </div>
       </td>
     </tr>
   );
