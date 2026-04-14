@@ -31,16 +31,26 @@ export async function POST(req: NextRequest) {
 
     try {
       const paymentLink = `${appUrl}/pay/${company.id}`;
-      const textBody = (settings.email_body_template || "")
-        .replace(/\{\{companyName\}\}/g, company.companyName)
-        .replace(/\{\{documentType\}\}/g, company.documentType)
-        .replace(/\{\{documentNumber\}\}/g, company.documentNumber)
-        .replace(
-          /\{\{serviceDate\}\}/g,
-          new Date(company.serviceDate).toLocaleDateString("en-US")
-        )
-        .replace(/\{\{price\}\}/g, (priceCents / 100).toFixed(2))
-        .replace(/\{\{paymentLink\}\}/g, paymentLink);
+
+      // Shared interpolation — works for both subject and body
+      const interpolate = (tpl: string) =>
+        tpl
+          .replace(/\{\{companyName\}\}/g, company.companyName)
+          .replace(/\{\{documentType\}\}/g, company.documentType)
+          .replace(/\{\{documentNumber\}\}/g, company.documentNumber)
+          .replace(
+            /\{\{serviceDate\}\}/g,
+            new Date(company.serviceDate).toLocaleDateString("en-US")
+          )
+          .replace(/\{\{price\}\}/g, `$${(priceCents / 100).toFixed(2)}`)
+          .replace(/\{\{paymentLink\}\}/g, paymentLink);
+
+      const subject = interpolate(
+        settings.email_subject ||
+          "Your FMCSA {{documentType}} – Get Your Official Certificate"
+      );
+
+      const textBody = interpolate(settings.email_body_template || "");
 
       const htmlBody = `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
@@ -67,9 +77,7 @@ export async function POST(req: NextRequest) {
 
       await sendEmail({
         to: company.email,
-        subject:
-          settings.email_subject ||
-          "Your FMCSA Certificate of Authority is Ready - CertExpress",
+        subject,
         text: textBody,
         html: htmlBody,
       });

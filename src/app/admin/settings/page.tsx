@@ -97,7 +97,12 @@ export default function SettingsPage() {
             <Input
               value={settings.email_subject || ""}
               onChange={(e) => update("email_subject", e.target.value)}
+              placeholder="Your FMCSA {{documentType}} – Get Your Official Certificate"
             />
+            <p className="text-xs text-gray-400 mt-1">
+              Variables: {"{{companyName}}"}, {"{{documentType}}"},{"{{documentNumber}}"},{" "}
+              {"{{serviceDate}}"}, {"{{price}}"}
+            </p>
           </div>
 
           <div>
