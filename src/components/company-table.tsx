@@ -34,16 +34,25 @@ interface SortProps {
   sortDir: "asc" | "desc";
   query: string;
   dateFilter: string;
+  emailFilter: string;
   page: number;
 }
 
 function sortUrl(col: string, current: SortProps) {
-  // Toggle direction if same column, else default to asc
-  const dir = current.sortBy === col && current.sortDir === "asc" ? "desc" : "asc";
+  // Toggle dir when clicking the active column; default to asc for a new column
+  const dir =
+    current.sortBy === col && current.sortDir === "asc" ? "desc" : "asc";
+  // Always emit sort + dir so the server never has to guess
   const p: Record<string, string> = { sort: col, dir, page: "1" };
-  if (current.query)      p.q    = current.query;
-  if (current.dateFilter) p.date = current.dateFilter;
-  return "/admin/companies?" + Object.entries(p).map(([k, v]) => `${k}=${encodeURIComponent(v)}`).join("&");
+  if (current.query)       p.q     = current.query;
+  if (current.dateFilter)  p.date  = current.dateFilter;
+  if (current.emailFilter) p.email = current.emailFilter;
+  return (
+    "/admin/companies?" +
+    Object.entries(p)
+      .map(([k, v]) => `${k}=${encodeURIComponent(v)}`)
+      .join("&")
+  );
 }
 
 function SortHeader({
@@ -117,6 +126,7 @@ export function CompanyTable({
   sortDir = "desc",
   query = "",
   dateFilter = "",
+  emailFilter = "",
   page = 1,
 }: {
   companies: Company[];
@@ -124,9 +134,10 @@ export function CompanyTable({
   sortDir?: "asc" | "desc";
   query?: string;
   dateFilter?: string;
+  emailFilter?: string;
   page?: number;
 }) {
-  const sort: SortProps = { sortBy, sortDir, query, dateFilter, page };
+  const sort: SortProps = { sortBy, sortDir, query, dateFilter, emailFilter, page };
   const router = useRouter();
   const [rows, setRows] = useState<Company[]>(companies);
 
@@ -223,7 +234,7 @@ export function CompanyTable({
               <SortHeader col="documentType"   label="Type"     sort={sort} />
               <SortHeader col="serviceDate"    label="Date"     sort={sort} />
               <SortHeader col="city"           label="Location" sort={sort} />
-              <th className="px-4 py-3 text-gray-600">Email</th>
+              <SortHeader col="email"          label="Email"    sort={sort} />
               <th className="px-4 py-3 text-gray-600">PDF</th>
               <SortHeader col="createdAt"      label="Added"    sort={sort} />
               <th className="px-4 py-3 text-gray-600">Actions</th>
