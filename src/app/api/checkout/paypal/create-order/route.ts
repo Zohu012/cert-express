@@ -15,7 +15,9 @@ export async function POST(req: NextRequest) {
     }
 
     const priceCents = await getPriceCents();
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
 
+    // Create internal order first so we have its ID for custom_id
     const order = await prisma.order.create({
       data: {
         companyId,
@@ -26,17 +28,39 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    const ppOrder = await createPayPalOrder(priceCents, "USD");
+    const returnUrl = `${appUrl}/api/checkout/paypal/return`;
+    const cancelUrl = `${appUrl}/cancel`;
+
+    const ppOrder = await createPayPalOrder(
+      priceCents,
+      "USD",
+      returnUrl,
+      cancelUrl,
+      order.id
+    );
+
+    if (!ppOrder.id) {
+      console.error("PayPal order creation failed:", ppOrder);
+      await prisma.order.delete({ where: { id: order.id } });
+      return NextResponse.json(
+        { error: "Failed to create PayPal order" },
+        { status: 500 }
+      );
+    }
 
     await prisma.order.update({
       where: { id: order.id },
       data: { paymentId: ppOrder.id },
     });
 
-    // Find approval URL
-    const approveUrl = ppOrder.links?.find(
-      (l: { rel: string; href: string }) => l.rel === "approve"
-    )?.href;
+    // Find approval URL (payer-action for redirect flow)
+    const approveUrl =
+      ppOrder.links?.find(
+        (l: { rel: string; href: string }) => l.rel === "payer-action"
+      )?.href ||
+      ppOrder.links?.find(
+        (l: { rel: string; href: string }) => l.rel === "approve"
+      )?.href;
 
     return NextResponse.json({
       paypalOrderId: ppOrder.id,
