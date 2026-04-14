@@ -4,6 +4,8 @@ import path from "path";
 import { prisma } from "@/lib/db";
 import { verifySession } from "@/lib/auth";
 
+export const maxDuration = 300; // 5 minutes for large uploads
+
 export async function POST(req: NextRequest) {
   const adminId = await verifySession();
   if (!adminId) {
