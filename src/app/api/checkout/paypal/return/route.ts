@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { capturePayPalOrder } from "@/lib/paypal";
+import { sendOrderConfirmationEmail } from "@/lib/email";
 
 /**
  * PayPal redirects here after the buyer approves payment.
@@ -24,9 +25,10 @@ export async function GET(req: NextRequest) {
       return NextResponse.redirect(`${appUrl}/cancel`);
     }
 
-    // Find our internal order via paypalOrderId
+    // Find our internal order via paypalOrderId (include company for the email)
     const order = await prisma.order.findFirst({
       where: { paymentId: paypalOrderId },
+      include: { company: true },
     });
 
     if (!order) {
@@ -34,17 +36,36 @@ export async function GET(req: NextRequest) {
       return NextResponse.redirect(`${appUrl}/cancel`);
     }
 
+    const customerEmail =
+      capture.payment_source?.paypal?.email_address ||
+      capture.payer?.email_address ||
+      null;
+
     // Mark as completed
     await prisma.order.update({
       where: { id: order.id },
-      data: {
-        status: "completed",
-        customerEmail:
-          capture.payment_source?.paypal?.email_address ||
-          capture.payer?.email_address ||
-          null,
-      },
+      data: { status: "completed", customerEmail },
     });
+
+    // Send confirmation email with download link
+    if (customerEmail) {
+      try {
+        await sendOrderConfirmationEmail({
+          to:             customerEmail,
+          companyName:    order.company.companyName,
+          documentType:   order.company.documentType,
+          documentNumber: order.company.documentNumber,
+          serviceDate:    order.company.serviceDate,
+          amountCents:    order.amount,
+          downloadToken:  order.downloadToken,
+          maxDownloads:   order.maxDownloads,
+          expiresAt:      order.expiresAt,
+        });
+      } catch (emailErr) {
+        // Don't block the redirect if email fails
+        console.error("[PayPal] Confirmation email failed:", emailErr);
+      }
+    }
 
     // Redirect to success page with download token
     return NextResponse.redirect(

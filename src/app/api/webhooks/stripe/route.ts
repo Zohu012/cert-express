@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { prisma } from "@/lib/db";
 import { stripe } from "@/lib/stripe";
+import { sendOrderConfirmationEmail } from "@/lib/email";
 
 export async function POST(req: NextRequest) {
   const body = await req.text();
@@ -27,16 +28,38 @@ export async function POST(req: NextRequest) {
     const orderId = session.metadata?.orderId;
 
     if (orderId) {
-      const order = await prisma.order.findUnique({ where: { id: orderId } });
+      const order = await prisma.order.findUnique({
+        where: { id: orderId },
+        include: { company: true },
+      });
 
       if (order && order.status !== "completed") {
+        const customerEmail = session.customer_details?.email || null;
+
         await prisma.order.update({
           where: { id: orderId },
-          data: {
-            status: "completed",
-            customerEmail: session.customer_details?.email || null,
-          },
+          data: { status: "completed", customerEmail },
         });
+
+        // Send confirmation email with download link
+        if (customerEmail) {
+          try {
+            await sendOrderConfirmationEmail({
+              to: customerEmail,
+              companyName:    order.company.companyName,
+              documentType:   order.company.documentType,
+              documentNumber: order.company.documentNumber,
+              serviceDate:    order.company.serviceDate,
+              amountCents:    order.amount,
+              downloadToken:  order.downloadToken,
+              maxDownloads:   order.maxDownloads,
+              expiresAt:      order.expiresAt,
+            });
+          } catch (emailErr) {
+            // Don't fail the webhook if email fails
+            console.error("[Stripe] Confirmation email failed:", emailErr);
+          }
+        }
       }
     }
   }
