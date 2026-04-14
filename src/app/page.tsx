@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { prisma } from "@/lib/db";
+import { getPriceCents } from "@/lib/settings";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 
@@ -11,6 +12,9 @@ export default async function HomePage({
   const params = await searchParams;
   const searchType = params.type || "dot";
   const query = params.q || "";
+
+  const priceCents = await getPriceCents();
+  const priceDisplay = `$${(priceCents / 100).toFixed(2)}`;
 
   let companies: Awaited<ReturnType<typeof prisma.company.findMany>> = [];
   let searched = false;
@@ -139,7 +143,7 @@ export default async function HomePage({
                         </span>
                         <span>
                           <strong>Date:</strong>{" "}
-                          {new Date(company.serviceDate).toLocaleDateString()}
+                          {(() => { const d = new Date(company.serviceDate); return `${d.getUTCFullYear()}-${String(d.getUTCMonth()+1).padStart(2,"0")}-${String(d.getUTCDate()).padStart(2,"0")}`; })()}
                         </span>
                         <span>
                           {company.city}, {company.state}
@@ -150,7 +154,7 @@ export default async function HomePage({
                       href={`/pay/${company.id}`}
                       className="inline-flex items-center justify-center rounded-lg bg-green-600 px-5 py-2.5 text-sm font-medium text-white hover:bg-green-700 transition whitespace-nowrap"
                     >
-                      Get Certificate &mdash; $30
+                      Get Certificate &mdash; {priceDisplay}
                     </Link>
                   </div>
                 </Card>

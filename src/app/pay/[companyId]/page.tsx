@@ -80,7 +80,7 @@ export default async function PayPage({
                   <span className="text-gray-500">Service Date:</span>
                   <br />
                   <strong>
-                    {new Date(company.serviceDate).toLocaleDateString()}
+                    {(() => { const d = new Date(company.serviceDate); return `${d.getUTCFullYear()}-${String(d.getUTCMonth()+1).padStart(2,"0")}-${String(d.getUTCDate()).padStart(2,"0")}`; })()}
                   </strong>
                 </div>
               </div>
