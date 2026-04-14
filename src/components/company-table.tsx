@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 
@@ -140,6 +140,8 @@ export function CompanyTable({
   const sort: SortProps = { sortBy, sortDir, query, dateFilter, emailFilter, page };
   const router = useRouter();
   const [rows, setRows] = useState<Company[]>(companies);
+  // Sync rows whenever the server sends fresh data (e.g. after sort/filter navigation)
+  useEffect(() => { setRows(companies); }, [companies]);
 
   // Delete state
   const [deleteId, setDeleteId]     = useState<string | null>(null);
