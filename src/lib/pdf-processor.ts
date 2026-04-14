@@ -18,22 +18,32 @@ export async function processPdf(sourcePdfId: string, filePath: string) {
   try {
     const companies = await runPythonParser(filePath);
 
-    // Batch insert companies
+    // Upsert companies — update if (usdotNumber, documentNumber) already exists
     for (const company of companies) {
-      await prisma.company.create({
-        data: {
-          companyName: company.companyName,
-          dbaName: company.dbaName,
-          streetAddress: company.streetAddress,
-          city: company.city,
-          state: company.state,
-          zipCode: company.zipCode,
+      const commonData = {
+        companyName: company.companyName,
+        dbaName: company.dbaName ?? null,
+        streetAddress: company.streetAddress ?? null,
+        city: company.city ?? null,
+        state: company.state ?? null,
+        zipCode: company.zipCode ?? null,
+        documentType: company.documentType,
+        serviceDate: new Date(company.serviceDate),
+        pdfFilename: company.pdfFilename,
+        sourcePdfId,
+      };
+      await prisma.company.upsert({
+        where: {
+          usdotNumber_documentNumber: {
+            usdotNumber: company.usdotNumber,
+            documentNumber: company.documentNumber,
+          },
+        },
+        update: commonData,
+        create: {
+          ...commonData,
           usdotNumber: company.usdotNumber,
           documentNumber: company.documentNumber,
-          documentType: company.documentType,
-          serviceDate: new Date(company.serviceDate),
-          pdfFilename: company.pdfFilename,
-          sourcePdfId,
         },
       });
     }

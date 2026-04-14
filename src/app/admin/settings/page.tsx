@@ -117,12 +117,53 @@ export default function SettingsPage() {
             </p>
           </div>
 
+          {/* ── Cron Schedule ── */}
+          <div className="border-t pt-4">
+            <label className="block text-sm font-semibold mb-1">
+              Auto-Fetch Cron Schedule
+            </label>
+            <p className="text-xs text-gray-500 mb-2">
+              When to automatically download the daily FMCSA PDF (UTC time,
+              weekdays). Default: <code>7 19 * * 1-5</code> = 2:07 PM Eastern.
+              Changes take effect after server restart.
+            </p>
+            <Input
+              value={settings.cron_schedule || "7 19 * * 1-5"}
+              onChange={(e) => update("cron_schedule", e.target.value)}
+              placeholder="7 19 * * 1-5"
+              className="font-mono"
+            />
+            <div className="mt-2 flex flex-wrap gap-2">
+              {[
+                { label: "2:07 PM ET (default)", value: "7 19 * * 1-5" },
+                { label: "9:07 AM ET", value: "7 14 * * 1-5" },
+                { label: "3:07 PM ET", value: "7 20 * * 1-5" },
+                { label: "4:07 PM ET", value: "7 21 * * 1-5" },
+              ].map((preset) => (
+                <button
+                  key={preset.value}
+                  type="button"
+                  onClick={() => update("cron_schedule", preset.value)}
+                  className={`text-xs px-2 py-1 rounded border ${
+                    (settings.cron_schedule || "7 19 * * 1-5") === preset.value
+                      ? "bg-blue-600 text-white border-blue-600"
+                      : "border-gray-300 hover:bg-gray-50"
+                  }`}
+                >
+                  {preset.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
           <div className="flex items-center gap-3">
             <Button type="submit" disabled={saving}>
               {saving ? "Saving..." : "Save Settings"}
             </Button>
             {saved && (
-              <span className="text-sm text-green-600">Settings saved!</span>
+              <span className="text-sm text-green-600">
+                Settings saved! Restart server to apply cron changes.
+              </span>
             )}
           </div>
         </Card>

@@ -42,6 +42,7 @@ model Company {
   orders         Order[]
   createdAt      DateTime  @default(now())
 
+  @@unique([usdotNumber, documentNumber])
   @@index([usdotNumber])
   @@index([documentNumber])
   @@index([companyName])
