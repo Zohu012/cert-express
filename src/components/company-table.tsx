@@ -2,6 +2,7 @@
 
 import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 
 interface Company {
   id: string;
@@ -11,6 +12,7 @@ interface Company {
   documentNumber: string;
   documentType: string;
   serviceDate: Date;
+  createdAt: Date;
   streetAddress: string | null;
   city: string | null;
   state: string | null;
@@ -23,6 +25,58 @@ interface Company {
 function formatDate(date: Date) {
   const d = new Date(date);
   return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}-${String(d.getUTCDate()).padStart(2, "0")}`;
+}
+
+// ─── Sort helpers ────────────────────────────────────────────────────────────
+
+interface SortProps {
+  sortBy: string;
+  sortDir: "asc" | "desc";
+  query: string;
+  dateFilter: string;
+  page: number;
+}
+
+function sortUrl(col: string, current: SortProps) {
+  // Toggle direction if same column, else default to asc
+  const dir = current.sortBy === col && current.sortDir === "asc" ? "desc" : "asc";
+  const p: Record<string, string> = { sort: col, dir, page: "1" };
+  if (current.query)      p.q    = current.query;
+  if (current.dateFilter) p.date = current.dateFilter;
+  return "/admin/companies?" + Object.entries(p).map(([k, v]) => `${k}=${encodeURIComponent(v)}`).join("&");
+}
+
+function SortHeader({
+  col,
+  label,
+  sort,
+  className = "",
+}: {
+  col: string;
+  label: string;
+  sort: SortProps;
+  className?: string;
+}) {
+  const active = sort.sortBy === col;
+  const icon = active
+    ? sort.sortDir === "asc"
+      ? " ↑"
+      : " ↓"
+    : " ↕";
+
+  return (
+    <th className={`px-4 py-3 ${className}`}>
+      <Link
+        href={sortUrl(col, sort)}
+        className={`inline-flex items-center gap-0.5 hover:text-blue-600 transition-colors ${
+          active ? "text-blue-700 font-semibold" : "text-gray-600"
+        }`}
+      >
+        {label}
+        <span className={`text-xs ${active ? "text-blue-500" : "text-gray-400"}`}>{icon}</span>
+      </Link>
+    </th>
+  );
 }
 
 // ─── Edit form state ────────────────────────────────────────────────────────
@@ -57,7 +111,22 @@ function companyToForm(c: Company): EditForm {
 }
 
 // ─── CompanyTable ────────────────────────────────────────────────────────────
-export function CompanyTable({ companies }: { companies: Company[] }) {
+export function CompanyTable({
+  companies,
+  sortBy = "createdAt",
+  sortDir = "desc",
+  query = "",
+  dateFilter = "",
+  page = 1,
+}: {
+  companies: Company[];
+  sortBy?: string;
+  sortDir?: "asc" | "desc";
+  query?: string;
+  dateFilter?: string;
+  page?: number;
+}) {
+  const sort: SortProps = { sortBy, sortDir, query, dateFilter, page };
   const router = useRouter();
   const [rows, setRows] = useState<Company[]>(companies);
 
@@ -147,16 +216,17 @@ export function CompanyTable({ companies }: { companies: Company[] }) {
       <div className="bg-white rounded-xl border shadow-sm overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
-            <tr className="border-b bg-gray-50 text-left text-gray-600">
-              <th className="px-4 py-3">Company</th>
-              <th className="px-4 py-3">DOT#</th>
-              <th className="px-4 py-3">Document</th>
-              <th className="px-4 py-3">Type</th>
-              <th className="px-4 py-3">Date</th>
-              <th className="px-4 py-3">Location</th>
-              <th className="px-4 py-3">Email</th>
-              <th className="px-4 py-3">PDF</th>
-              <th className="px-4 py-3">Actions</th>
+            <tr className="border-b bg-gray-50 text-left whitespace-nowrap">
+              <SortHeader col="companyName"    label="Company"  sort={sort} />
+              <SortHeader col="usdotNumber"    label="DOT#"     sort={sort} />
+              <SortHeader col="documentNumber" label="Document" sort={sort} />
+              <SortHeader col="documentType"   label="Type"     sort={sort} />
+              <SortHeader col="serviceDate"    label="Date"     sort={sort} />
+              <SortHeader col="city"           label="Location" sort={sort} />
+              <th className="px-4 py-3 text-gray-600">Email</th>
+              <th className="px-4 py-3 text-gray-600">PDF</th>
+              <SortHeader col="createdAt"      label="Added"    sort={sort} />
+              <th className="px-4 py-3 text-gray-600">Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -591,6 +661,11 @@ function CompanyRow({
             />
           </label>
         </div>
+      </td>
+
+      {/* Added date */}
+      <td className="px-4 py-2 text-gray-400 text-xs whitespace-nowrap">
+        {formatDate(company.createdAt)}
       </td>
 
       {/* Actions */}
