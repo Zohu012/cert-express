@@ -19,7 +19,7 @@ export default function PrivacyPage() {
             <p>
               CertExpress is a private document delivery service operated by
               NaachTech. We are not affiliated with any government agency.
-              Contact: support@certexpresss.com
+              Contact: orders@certexpresss.com
             </p>
           </section>
 
@@ -95,10 +95,10 @@ export default function PrivacyPage() {
               accounting and legal compliance purposes. To request deletion of
               your email address, contact us at{" "}
               <a
-                href="mailto:support@certexpresss.com"
+                href="mailto:orders@certexpresss.com"
                 className="text-blue-600 hover:underline"
               >
-                support@certexpresss.com
+                orders@certexpresss.com
               </a>
               .
             </p>
@@ -118,10 +118,10 @@ export default function PrivacyPage() {
               You may request access to, correction of, or deletion of your
               personal data by emailing{" "}
               <a
-                href="mailto:support@certexpresss.com"
+                href="mailto:orders@certexpresss.com"
                 className="text-blue-600 hover:underline"
               >
-                support@certexpresss.com
+                orders@certexpresss.com
               </a>
               . We will respond within 30 days.
             </p>
@@ -132,10 +132,10 @@ export default function PrivacyPage() {
             <p>
               For privacy-related inquiries, contact:{" "}
               <a
-                href="mailto:support@certexpresss.com"
+                href="mailto:orders@certexpresss.com"
                 className="text-blue-600 hover:underline"
               >
-                support@certexpresss.com
+                orders@certexpresss.com
               </a>
             </p>
           </section>

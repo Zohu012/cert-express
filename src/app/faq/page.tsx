@@ -23,7 +23,7 @@ const faqs = [
   },
   {
     q: "What if I cannot download my document?",
-    a: "Email us at support@certexpresss.com with your order email address. We will resend the download link or issue a refund if the document was not delivered successfully.",
+    a: "Email us at orders@certexpresss.com with your order email address. We will resend the download link or issue a refund if the document was not delivered successfully.",
   },
   {
     q: "Can I get a refund?",
@@ -35,7 +35,7 @@ const faqs = [
   },
   {
     q: "How long is the download link valid?",
-    a: "Download links are valid for 72 hours from the time of purchase and allow up to 5 downloads. If your link has expired, contact us at support@certexpresss.com.",
+    a: "Download links are valid for 72 hours from the time of purchase and allow up to 5 downloads. If your link has expired, contact us at orders@certexpresss.com.",
   },
   {
     q: "What payment methods are accepted?",
@@ -81,10 +81,10 @@ export default function FaqPage() {
             Still have questions? We&rsquo;re here to help.
           </p>
           <a
-            href="mailto:support@certexpresss.com"
+            href="mailto:orders@certexpresss.com"
             className="text-blue-600 font-medium hover:underline"
           >
-            support@certexpresss.com
+            orders@certexpresss.com
           </a>
         </div>
       </div>

@@ -63,7 +63,7 @@ We may update these terms at any time. Continued use of the service constitutes 
 
 ## 10. Contact
 
-Questions about these terms? Email us: support@certexpresss.com
+Questions about these terms? Email us: orders@certexpresss.com
 `.trim();
 
 export default async function TermsPage() {

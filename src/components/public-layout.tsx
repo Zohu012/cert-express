@@ -64,7 +64,7 @@ export function PublicLayout({ children }: { children: React.ReactNode }) {
 
           {/* Copyright */}
           <div className="text-center text-xs text-gray-400 space-y-1">
-            <p>Email: support@certexpresss.com</p>
+            <p>Email: orders@certexpresss.com</p>
             <p>
               &copy; {new Date().getFullYear()} CertExpress, operated by
               NaachTech. All rights reserved.

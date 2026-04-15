@@ -89,10 +89,10 @@ export default function AboutPage() {
             <p className="mt-2">
               Questions? Email us at{" "}
               <a
-                href="mailto:support@certexpresss.com"
+                href="mailto:orders@certexpresss.com"
                 className="text-blue-600 hover:underline"
               >
-                support@certexpresss.com
+                orders@certexpresss.com
               </a>
               .
             </p>
