@@ -32,13 +32,13 @@ export function PublicLayout({ children }: { children: React.ReactNode }) {
           {/* Logo in footer */}
           <div className="flex justify-center mb-5">
             <Link href="/">
-              <div className="bg-blue-900 rounded-xl px-6 py-3 inline-block">
+              <div className="bg-blue-900 rounded-2xl px-8 py-4 inline-block">
                 <Image
                   src="/logo.png"
                   alt="CertExpress"
-                  width={240}
-                  height={72}
-                  className="h-14 w-auto object-contain"
+                  width={420}
+                  height={120}
+                  className="h-20 w-auto object-contain"
                 />
               </div>
             </Link>
