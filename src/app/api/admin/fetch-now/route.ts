@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
+import { existsSync } from "fs";
+import path from "path";
 import { verifySession } from "@/lib/auth";
 import { fetchDailyPdf } from "@/lib/pdf-fetcher";
+import { processPdf } from "@/lib/pdf-processor";
 import { prisma } from "@/lib/db";
 
 export async function POST(req: NextRequest) {
@@ -12,10 +15,9 @@ export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => ({}));
   const dateStr: string | undefined = body.date;
 
-  // Parse the requested date (YYYY-MM-DD) or default to today
   let targetDate: Date;
   if (dateStr) {
-    targetDate = new Date(`${dateStr}T12:00:00Z`); // noon UTC to avoid timezone shifts
+    targetDate = new Date(`${dateStr}T12:00:00Z`);
     if (isNaN(targetDate.getTime())) {
       return NextResponse.json({ error: "Invalid date" }, { status: 400 });
     }
@@ -28,18 +30,38 @@ export async function POST(req: NextRequest) {
   const day = String(targetDate.getUTCDate()).padStart(2, "0");
   const filename = `LI_CPL${year}${month}${day}.pdf`;
 
-  // Check if already downloaded
   const existing = await prisma.sourcePdf.findFirst({ where: { filename } });
+
   if (existing) {
-    return NextResponse.json({
-      status: "already_exists",
-      sourcePdfId: existing.id,
-      companyCount: existing.companyCount,
-      pdfStatus: existing.status,
-    });
+    // Already completed — nothing to do
+    if (existing.status === "completed") {
+      return NextResponse.json({
+        status: "already_exists",
+        sourcePdfId: existing.id,
+        companyCount: existing.companyCount,
+        pdfStatus: existing.status,
+      });
+    }
+
+    // Failed or stuck — try to recover
+    const filePath = path.join(process.cwd(), "data", "source", filename);
+
+    if (existsSync(filePath)) {
+      // PDF is on disk — reprocess it (upsert logic in processPdf prevents duplicate companies)
+      console.log(`[fetch-now] Re-processing existing file: ${filename}`);
+      processPdf(existing.id, filePath).catch((err) =>
+        console.error("[fetch-now] Reprocess failed:", err)
+      );
+      return NextResponse.json({ status: "downloaded", sourcePdfId: existing.id });
+    } else {
+      // File missing from disk — delete the stale DB record and re-download
+      console.log(`[fetch-now] Stale record for ${filename} (file missing) — re-downloading`);
+      await prisma.sourcePdf.delete({ where: { id: existing.id } });
+      // Fall through to fresh download below
+    }
   }
 
-  // Attempt download + auto-processing (fire-and-forget inside fetchDailyPdf)
+  // Fresh download + auto-processing
   const sourcePdfId = await fetchDailyPdf(targetDate);
 
   if (sourcePdfId === null) {
