@@ -64,7 +64,8 @@ export default async function EmailHistoryPage({
     where.OR = [
       { toEmail:           { contains: query } },
       { subject:           { contains: query } },
-      { company: { companyName: { contains: query } } },
+      { company: { companyName:  { contains: query } } },
+      { company: { usdotNumber:  { contains: query } } },
     ];
   }
   if (dateFilter) {
@@ -90,7 +91,7 @@ export default async function EmailHistoryPage({
       orderBy: makeOrderBy(sortBy, sortDir),
       skip: (page - 1) * perPage,
       take: perPage,
-      include: { company: { select: { companyName: true } } },
+      include: { company: { select: { companyName: true, usdotNumber: true } } },
     }),
     prisma.emailLog.count({ where }),
   ]);
@@ -175,7 +176,7 @@ export default async function EmailHistoryPage({
             type="text"
             name="q"
             defaultValue={query}
-            placeholder="Search by email, company, or subject"
+            placeholder="Search by email, company, USDOT, or subject"
             className="flex-1 min-w-[200px] rounded-lg border border-gray-300 px-3 py-2 text-sm"
           />
           <input
@@ -270,6 +271,7 @@ export default async function EmailHistoryPage({
             <tr>
               <SortHeader col="sentAt"      label="Sent At" />
               <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase">Company</th>
+              <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase whitespace-nowrap">US DOT #</th>
               <SortHeader col="toEmail"     label="Email" />
               <SortHeader col="subject"     label="Subject" />
               <SortHeader col="openCount"   label="Opened" />
@@ -280,7 +282,7 @@ export default async function EmailHistoryPage({
           <tbody className="divide-y divide-gray-100">
             {logs.length === 0 && (
               <tr>
-                <td colSpan={7} className="px-3 py-8 text-center text-gray-400">
+                <td colSpan={8} className="px-3 py-8 text-center text-gray-400">
                   No email logs found.
                 </td>
               </tr>
@@ -299,6 +301,9 @@ export default async function EmailHistoryPage({
                   </td>
                   <td className="px-3 py-2 font-medium text-gray-900 max-w-[160px] truncate">
                     {log.company.companyName}
+                  </td>
+                  <td className="px-3 py-2 font-mono text-xs text-gray-600 whitespace-nowrap">
+                    {log.company.usdotNumber}
                   </td>
                   <td className="px-3 py-2 text-gray-600 max-w-[180px] truncate">
                     {log.toEmail}
