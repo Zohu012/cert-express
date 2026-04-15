@@ -100,9 +100,9 @@ export async function sendOrderConfirmationEmail({
 
         <!-- Header -->
         <tr>
-          <td style="background:#1e3a5f;padding:28px 40px;text-align:center;">
-            <h1 style="margin:0;color:#ffffff;font-size:26px;letter-spacing:-0.5px;">CertExpress</h1>
-            <p style="margin:6px 0 0;color:#93c5fd;font-size:13px;">FMCSA Certificate Delivery</p>
+          <td style="background:#000000;padding:16px 40px;text-align:center;">
+            <img src="${appUrl}/logo.png" alt="CertExpress" width="180" style="height:54px;width:auto;display:inline-block;" />
+            <p style="margin:6px 0 0;color:#9ca3af;font-size:13px;">FMCSA Document Delivery Service</p>
           </td>
         </tr>
 

@@ -46,7 +46,7 @@ export default async function HomePage({
   return (
     <PublicLayout>
       {/* Hero + Search */}
-      <div className="bg-blue-800 text-white py-12">
+      <div className="bg-gray-900 text-white py-12">
         <div className="max-w-3xl mx-auto px-4 text-center">
           <h1 className="text-3xl font-bold mb-3">
             FMCSA Certificate of Authority Lookup

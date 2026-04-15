@@ -1,15 +1,23 @@
 import Link from "next/link";
+import Image from "next/image";
 
 export function PublicLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen flex flex-col">
-      {/* Header */}
-      <header className="bg-blue-900 text-white">
-        <div className="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
-          <Link href="/" className="text-2xl font-bold tracking-tight">
-            CertExpress
+      {/* Header — black bg matches the logo's black background */}
+      <header className="bg-black">
+        <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
+          <Link href="/" className="flex items-center">
+            <Image
+              src="/logo.png"
+              alt="CertExpress"
+              width={200}
+              height={60}
+              className="h-12 w-auto object-contain"
+              priority
+            />
           </Link>
-          <p className="text-blue-200 text-sm hidden sm:block">
+          <p className="text-gray-400 text-sm hidden sm:block">
             FMCSA Document Delivery Service
           </p>
         </div>
@@ -21,6 +29,19 @@ export function PublicLayout({ children }: { children: React.ReactNode }) {
       {/* Footer */}
       <footer className="bg-gray-100 border-t pt-8 pb-6">
         <div className="max-w-6xl mx-auto px-4">
+          {/* Logo in footer */}
+          <div className="flex justify-center mb-5">
+            <Link href="/">
+              <Image
+                src="/logo.png"
+                alt="CertExpress"
+                width={140}
+                height={42}
+                className="h-10 w-auto object-contain bg-black rounded-lg px-2 py-1"
+              />
+            </Link>
+          </div>
+
           {/* Mandatory disclaimer */}
           <div className="mb-5 text-center">
             <p className="text-sm font-semibold text-gray-700 max-w-2xl mx-auto">
