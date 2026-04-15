@@ -117,8 +117,9 @@ export default function SettingsPage() {
             />
             <p className="text-xs text-gray-400 mt-1">
               Variables: {"{{companyName}}"}, {"{{documentType}}"},{" "}
-              {"{{documentNumber}}"}, {"{{serviceDate}}"}, {"{{price}}"},{" "}
-              {"{{paymentLink}}"}
+              {"{{documentNumber}}"}, {"{{usdotNumber}}"}, {"{{serviceDate}}"},{" "}
+              {"{{price}}"}, {"{{paymentLink}}"}, {"{{dbaName}}"},{" "}
+              {"{{city}}"}, {"{{state}}"}
             </p>
           </div>
 

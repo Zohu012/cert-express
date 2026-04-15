@@ -159,6 +159,10 @@ export async function POST(req: NextRequest) {
           .replace(/\{\{companyName\}\}/g, company.companyName)
           .replace(/\{\{documentType\}\}/g, company.documentType)
           .replace(/\{\{documentNumber\}\}/g, company.documentNumber)
+          .replace(/\{\{usdotNumber\}\}/g, company.usdotNumber)
+          .replace(/\{\{dbaName\}\}/g, company.dbaName || "")
+          .replace(/\{\{city\}\}/g, company.city || "")
+          .replace(/\{\{state\}\}/g, company.state || "")
           .replace(
             /\{\{serviceDate\}\}/g,
             new Date(company.serviceDate).toLocaleDateString("en-US")
