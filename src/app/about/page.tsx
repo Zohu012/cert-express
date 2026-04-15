@@ -21,18 +21,8 @@ export default function AboutPage() {
               of Authority, Permits, and Licenses — directly to your inbox.
             </p>
             <p className="mt-2">
-              These documents are published daily by the US government and are
-              freely accessible at{" "}
-              <a
-                href="https://fmcsa.dot.gov"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-blue-600 hover:underline"
-              >
-                fmcsa.dot.gov
-              </a>
-              . CertExpress saves you hours of searching by finding your
-              document instantly and delivering it as a clean, ready-to-use PDF.
+              Don&apos;t wait for mail delivery. CertExpress gives you instant
+              access to your document in a clean, ready-to-use PDF format.
             </p>
           </section>
 
