@@ -4,6 +4,131 @@ import { verifySession } from "@/lib/auth";
 import { getSettings, getPriceCents } from "@/lib/settings";
 import { sendEmail } from "@/lib/email";
 
+/** Convert plain-text email template to HTML, turning the payment link into a button */
+function templateToHtml(
+  text: string,
+  paymentLink: string,
+  appUrl: string
+): string {
+  const logoUrl = `${appUrl}/logo.png`;
+
+  // Split into lines and build HTML paragraphs
+  const lines = text.split("\n");
+  let bodyHtml = "";
+  let inList = false;
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+
+    // Payment link line → green button
+    if (trimmed.includes(paymentLink)) {
+      if (inList) { bodyHtml += "</ul>"; inList = false; }
+      bodyHtml += `
+        <div style="text-align:center;margin:28px 0;">
+          <a href="${paymentLink}"
+             style="display:inline-block;background:#16a34a;color:#ffffff;
+                    text-decoration:none;padding:16px 48px;border-radius:8px;
+                    font-size:16px;font-weight:bold;letter-spacing:0.2px;">
+            Get a Copy of Your Document
+          </a>
+        </div>`;
+      continue;
+    }
+
+    // Bullet point lines
+    if (trimmed.startsWith("•") || trimmed.startsWith("-")) {
+      if (!inList) { bodyHtml += '<ul style="margin:8px 0;padding-left:20px;">'; inList = true; }
+      bodyHtml += `<li style="padding:3px 0;color:#374151;font-size:14px;">${trimmed.replace(/^[•\-]\s*/, "")}</li>`;
+      continue;
+    }
+
+    if (inList) { bodyHtml += "</ul>"; inList = false; }
+
+    // Empty line → spacing
+    if (!trimmed) {
+      bodyHtml += '<div style="height:10px;"></div>';
+      continue;
+    }
+
+    // Section headings (e.g. "Document Details:")
+    if (trimmed.endsWith(":") && trimmed.length < 40) {
+      bodyHtml += `<p style="margin:14px 0 4px;font-weight:bold;color:#111827;font-size:14px;">${trimmed}</p>`;
+      continue;
+    }
+
+    // Regular line
+    bodyHtml += `<p style="margin:4px 0;color:#374151;font-size:14px;line-height:1.6;">${trimmed}</p>`;
+  }
+
+  if (inList) bodyHtml += "</ul>";
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#f3f4f6;font-family:Arial,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f3f4f6;padding:32px 0;">
+    <tr><td align="center">
+      <table width="600" cellpadding="0" cellspacing="0"
+             style="background:#ffffff;border-radius:12px;overflow:hidden;
+                    box-shadow:0 2px 8px rgba(0,0,0,0.08);max-width:600px;width:100%;">
+
+        <!-- Header with logo -->
+        <tr>
+          <td style="background:#1e3a5f;padding:16px 40px;text-align:center;">
+            <img src="${logoUrl}" alt="CertExpress" width="180"
+                 style="height:54px;width:auto;display:inline-block;" />
+            <p style="margin:6px 0 0;color:#93c5fd;font-size:13px;">FMCSA Document Delivery Service</p>
+          </td>
+        </tr>
+
+        <!-- Body -->
+        <tr>
+          <td style="padding:32px 40px;">
+            ${bodyHtml}
+          </td>
+        </tr>
+
+        <!-- Footer -->
+        <tr>
+          <td style="background:#f9fafb;border-top:1px solid #e5e7eb;padding:16px 40px;text-align:center;">
+            <p style="margin:0;color:#9ca3af;font-size:12px;">
+              CertExpress &mdash; FMCSA Document Delivery Service<br>
+              <a href="${appUrl}" style="color:#2563eb;">${appUrl.replace(/https?:\/\//, "")}</a>
+            </p>
+            <p style="margin:8px 0 0;color:#9ca3af;font-size:11px;">
+              CertExpress is a private service and is not affiliated with any government agency.
+            </p>
+          </td>
+        </tr>
+
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`;
+}
+
+const DEFAULT_TEMPLATE = `Dear {{companyName}},
+
+We identified that your FMCSA {{documentType}} has been successfully issued.
+
+Document Details:
+• Document Number: {{documentNumber}}
+• Service Date: {{serviceDate}}
+
+Your certificate is now available for immediate access.
+
+You can securely retrieve a processed copy here:
+
+{{paymentLink}}
+
+Our service provides fast, structured delivery so you can access your document without delays.
+
+If you have any questions, simply reply to this email.
+
+Best regards,
+CertExpress Team`;
+
 export async function POST(req: NextRequest) {
   const adminId = await verifySession();
   if (!adminId) {
@@ -16,10 +141,7 @@ export async function POST(req: NextRequest) {
     where: { id: { in: companyIds }, email: { not: null } },
   });
 
-  const settings = await getSettings([
-    "email_subject",
-    "email_body_template",
-  ]);
+  const settings = await getSettings(["email_subject", "email_body_template"]);
   const priceCents = await getPriceCents();
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
 
@@ -32,7 +154,6 @@ export async function POST(req: NextRequest) {
     try {
       const paymentLink = `${appUrl}/pay/${company.id}`;
 
-      // Shared interpolation — works for both subject and body
       const interpolate = (tpl: string) =>
         tpl
           .replace(/\{\{companyName\}\}/g, company.companyName)
@@ -47,33 +168,12 @@ export async function POST(req: NextRequest) {
 
       const subject = interpolate(
         settings.email_subject ||
-          "Your FMCSA {{documentType}} – Get Your Official Certificate"
+          "Your FMCSA {{documentType}} is Ready – Get Your Copy"
       );
 
-      const textBody = interpolate(settings.email_body_template || "");
-
-      const htmlBody = `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-          <div style="background: #1e3a5f; padding: 20px; text-align: center;">
-            <h1 style="color: white; margin: 0; font-size: 24px;">CertExpress</h1>
-          </div>
-          <div style="padding: 30px; background: #ffffff;">
-            <p>Dear <strong>${company.companyName}</strong>,</p>
-            <p>Congratulations on receiving your FMCSA <strong>${company.documentType}</strong>!</p>
-            <p>Your document <strong>${company.documentNumber}</strong> has been issued with a service date of ${new Date(company.serviceDate).toLocaleDateString("en-US")}.</p>
-            <p>Get your official certificate delivered instantly for just <strong>$${(priceCents / 100).toFixed(2)}</strong>.</p>
-            <div style="text-align: center; margin: 30px 0;">
-              <a href="${paymentLink}" style="background: #16a34a; color: white; padding: 14px 32px; text-decoration: none; border-radius: 8px; font-size: 16px; font-weight: bold;">
-                Get Your Certificate
-              </a>
-            </div>
-            <p style="color: #666; font-size: 13px;">This is a one-time payment. Your certificate PDF will be available for instant download after payment.</p>
-          </div>
-          <div style="padding: 15px; background: #f3f4f6; text-align: center; font-size: 12px; color: #888;">
-            CertExpress &mdash; FMCSA Certificate Delivery
-          </div>
-        </div>
-      `;
+      const template = settings.email_body_template || DEFAULT_TEMPLATE;
+      const textBody = interpolate(template);
+      const htmlBody = templateToHtml(textBody, paymentLink, appUrl);
 
       await sendEmail({
         to: company.email,
@@ -84,10 +184,7 @@ export async function POST(req: NextRequest) {
 
       await prisma.company.update({
         where: { id: company.id },
-        data: {
-          emailStatus: "sent",
-          emailSentAt: new Date(),
-        },
+        data: { emailStatus: "sent", emailSentAt: new Date() },
       });
       sent++;
     } catch (err) {
