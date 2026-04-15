@@ -81,11 +81,7 @@ export function PaymentButtons({
             className="mt-0.5 h-4 w-4 rounded border-gray-300 text-blue-600 flex-shrink-0"
           />
           <span className="text-sm text-gray-700 leading-relaxed">
-            I understand that this is a <strong>paid service</strong> for
-            accessing publicly available documents. I agree that the service
-            begins immediately and I waive my right of withdrawal. I acknowledge
-            that digital products are non-refundable after delivery. I have read
-            and agree to the{" "}
+            I have read and agree to the{" "}
             <Link
               href="/terms"
               target="_blank"
