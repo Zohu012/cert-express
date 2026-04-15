@@ -53,11 +53,27 @@ export default async function AdminLayout({
               >
                 Settings
               </Link>
+              <Link
+                href="/admin/users"
+                className="text-gray-300 hover:text-white transition"
+              >
+                Users
+              </Link>
             </nav>
           </div>
-          <Link href="/" className="text-sm text-gray-400 hover:text-white">
-            View Site
-          </Link>
+          <div className="flex items-center gap-4">
+            <Link href="/" className="text-sm text-gray-400 hover:text-white">
+              View Site
+            </Link>
+            <form action="/api/admin/logout" method="POST">
+              <button
+                type="submit"
+                className="text-sm text-gray-400 hover:text-white transition"
+              >
+                Log Out
+              </button>
+            </form>
+          </div>
         </div>
       </header>
       <main className="flex-1 bg-gray-50">{children}</main>
