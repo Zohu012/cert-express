@@ -152,7 +152,17 @@ export async function POST(req: NextRequest) {
     if (!company.email) continue;
 
     try {
-      const paymentLink = `${appUrl}/pay/${company.id}`;
+      // 1. Create EmailLog record first to get tracking ID
+      const emailLog = await prisma.emailLog.create({
+        data: {
+          companyId: company.id,
+          toEmail: company.email,
+          subject: "", // will update after interpolation
+        },
+      });
+
+      // 2. Use tracking URL so clicks are recorded
+      const trackingUrl = `${appUrl}/api/track/${emailLog.id}`;
 
       const interpolate = (tpl: string) =>
         tpl
@@ -168,7 +178,7 @@ export async function POST(req: NextRequest) {
             new Date(company.serviceDate).toLocaleDateString("en-US")
           )
           .replace(/\{\{price\}\}/g, `$${(priceCents / 100).toFixed(2)}`)
-          .replace(/\{\{paymentLink\}\}/g, paymentLink);
+          .replace(/\{\{paymentLink\}\}/g, trackingUrl);
 
       const subject = interpolate(
         settings.email_subject ||
@@ -177,7 +187,7 @@ export async function POST(req: NextRequest) {
 
       const template = settings.email_body_template || DEFAULT_TEMPLATE;
       const textBody = interpolate(template);
-      const htmlBody = templateToHtml(textBody, paymentLink, appUrl);
+      const htmlBody = templateToHtml(textBody, trackingUrl, appUrl);
 
       await sendEmail({
         to: company.email,
@@ -186,10 +196,17 @@ export async function POST(req: NextRequest) {
         html: htmlBody,
       });
 
-      await prisma.company.update({
-        where: { id: company.id },
-        data: { emailStatus: "sent", emailSentAt: new Date() },
-      });
+      // 3. Update log with resolved subject + mark company as sent
+      await Promise.all([
+        prisma.emailLog.update({
+          where: { id: emailLog.id },
+          data: { subject },
+        }),
+        prisma.company.update({
+          where: { id: company.id },
+          data: { emailStatus: "sent", emailSentAt: new Date() },
+        }),
+      ]);
       sent++;
     } catch (err) {
       console.error(`Failed to email ${company.email}:`, err);

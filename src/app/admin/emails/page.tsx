@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Link from "next/link";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 
@@ -73,11 +74,19 @@ export default function EmailsPage() {
     <div className="max-w-7xl mx-auto px-4 py-8">
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold">Email Campaigns</h1>
-        <Button onClick={sendEmails} disabled={sending || selected.size === 0}>
-          {sending
-            ? "Sending..."
-            : `Send to ${selected.size} ${selected.size === 1 ? "company" : "companies"}`}
-        </Button>
+        <div className="flex items-center gap-3">
+          <Link
+            href="/admin/emails/history"
+            className="rounded-lg border border-gray-300 px-4 py-2 text-sm hover:bg-gray-50"
+          >
+            View History →
+          </Link>
+          <Button onClick={sendEmails} disabled={sending || selected.size === 0}>
+            {sending
+              ? "Sending..."
+              : `Send to ${selected.size} ${selected.size === 1 ? "company" : "companies"}`}
+          </Button>
+        </div>
       </div>
 
       {result && (

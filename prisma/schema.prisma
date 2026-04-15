@@ -40,6 +40,7 @@ model Company {
   sourcePdfId    String
   sourcePdf      SourcePdf @relation(fields: [sourcePdfId], references: [id])
   orders         Order[]
+  emailLogs      EmailLog[]
   createdAt      DateTime  @default(now())
 
   @@unique([usdotNumber, documentNumber])
@@ -73,6 +74,20 @@ model Order {
   @@index([paymentId])
   @@index([downloadToken])
   @@index([status])
+}
+
+model EmailLog {
+  id          String    @id @default(uuid())
+  companyId   String
+  company     Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  toEmail     String
+  subject     String
+  sentAt      DateTime  @default(now())
+  clickCount  Int       @default(0)
+  lastClickAt DateTime?
+
+  @@index([companyId])
+  @@index([sentAt])
 }
 
 model Setting {
