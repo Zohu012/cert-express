@@ -9,8 +9,8 @@ import Link from "next/link";
 
 // ─── Sortable columns ────────────────────────────────────────────────────────
 const SORTABLE_COLS = [
-  "sentAt", "toEmail", "subject", "clickCount", "lastClickAt",
-  "openCount", "firstOpenAt",
+  "sentAt", "companyName", "usdotNumber", "toEmail", "subject",
+  "clickCount", "lastClickAt", "openCount", "firstOpenAt",
 ] as const;
 type SortCol = typeof SORTABLE_COLS[number];
 
@@ -25,13 +25,15 @@ function makeOrderBy(
   dir: "asc" | "desc"
 ): Prisma.EmailLogOrderByWithRelationInput {
   const map: Record<SortCol, Prisma.EmailLogOrderByWithRelationInput> = {
-    sentAt:      { sentAt:      dir },
-    toEmail:     { toEmail:     dir },
-    subject:     { subject:     dir },
-    clickCount:  { clickCount:  dir },
-    lastClickAt: { lastClickAt: dir },
-    openCount:   { openCount:   dir },
-    firstOpenAt: { firstOpenAt: dir },
+    sentAt:       { sentAt:      dir },
+    companyName:  { company: { companyName:  dir } },
+    usdotNumber:  { company: { usdotNumber:  dir } },
+    toEmail:      { toEmail:     dir },
+    subject:      { subject:     dir },
+    clickCount:   { clickCount:  dir },
+    lastClickAt:  { lastClickAt: dir },
+    openCount:    { openCount:   dir },
+    firstOpenAt:  { firstOpenAt: dir },
   };
   return map[col];
 }
@@ -269,10 +271,10 @@ export default async function EmailHistoryPage({
         <table className="w-full text-sm">
           <thead className="bg-gray-50 border-b border-gray-200">
             <tr>
-              <SortHeader col="sentAt"      label="Sent At" />
-              <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase">Company</th>
-              <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase whitespace-nowrap">US DOT #</th>
-              <SortHeader col="toEmail"     label="Email" />
+              <SortHeader col="sentAt"       label="Sent At" />
+              <SortHeader col="companyName"  label="Company" />
+              <SortHeader col="usdotNumber"  label="US DOT #" />
+              <SortHeader col="toEmail"      label="Email" />
               <SortHeader col="subject"     label="Subject" />
               <SortHeader col="openCount"   label="Opened" />
               <SortHeader col="clickCount"  label="Clicks" />
