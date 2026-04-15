@@ -6,14 +6,14 @@ export function PublicLayout({ children }: { children: React.ReactNode }) {
     <div className="min-h-screen flex flex-col">
       {/* Header */}
       <header className="bg-blue-900">
-        <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
+        <div className="max-w-6xl mx-auto px-4 py-2 flex items-center justify-between">
           <Link href="/" className="flex items-center">
             <Image
               src="/logo.png"
               alt="CertExpress"
-              width={200}
-              height={60}
-              className="h-12 w-auto object-contain"
+              width={280}
+              height={80}
+              className="h-16 w-auto object-contain"
               priority
             />
           </Link>
