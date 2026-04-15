@@ -4,8 +4,8 @@ import Image from "next/image";
 export function PublicLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen flex flex-col">
-      {/* Header — black bg matches the logo's black background */}
-      <header className="bg-black">
+      {/* Header */}
+      <header className="bg-blue-900">
         <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
           <Link href="/" className="flex items-center">
             <Image
@@ -17,7 +17,7 @@ export function PublicLayout({ children }: { children: React.ReactNode }) {
               priority
             />
           </Link>
-          <p className="text-gray-400 text-sm hidden sm:block">
+          <p className="text-blue-200 text-sm hidden sm:block">
             FMCSA Document Delivery Service
           </p>
         </div>
@@ -37,7 +37,7 @@ export function PublicLayout({ children }: { children: React.ReactNode }) {
                 alt="CertExpress"
                 width={140}
                 height={42}
-                className="h-10 w-auto object-contain bg-black rounded-lg px-2 py-1"
+                className="h-10 w-auto object-contain bg-blue-900 rounded-lg px-2 py-1"
               />
             </Link>
           </div>
