@@ -14,10 +14,6 @@ const faqs = [
     a: "Yes. We retrieve exact copies of documents directly from the public FMCSA database. The documents are the same ones published by the government — we simply find and deliver them instantly, saving you hours of manual searching.",
   },
   {
-    q: "Aren't these documents free on fmcsa.dot.gov?",
-    a: "Yes, they are publicly available at no charge. CertExpress charges a service fee for the automated search, extraction, and instant PDF delivery. You are paying for the convenience of receiving your document immediately without navigating government systems.",
-  },
-  {
     q: "When will I receive my document?",
     a: "Immediately after your payment is confirmed. You will be taken to a download page and also receive an email with your download link within minutes.",
   },
