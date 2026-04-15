@@ -122,6 +122,52 @@ export default function SettingsPage() {
             </p>
           </div>
 
+          {/* ── Legal Content ── */}
+          <div className="border-t pt-4">
+            <label className="block text-sm font-semibold mb-1">
+              Legal Content Management
+            </label>
+            <p className="text-xs text-gray-500 mb-4">
+              These values are displayed on the{" "}
+              <a href="/terms" target="_blank" className="text-blue-600 hover:underline">
+                /terms
+              </a>{" "}
+              page. Updating terms_version here will require users to re-accept
+              on next checkout.
+            </p>
+
+            <div className="mb-4">
+              <label className="block text-sm font-medium mb-1">
+                Terms Version
+              </label>
+              <Input
+                value={settings.terms_version || "1.0"}
+                onChange={(e) => update("terms_version", e.target.value)}
+                placeholder="1.0"
+                className="max-w-xs font-mono"
+              />
+              <p className="text-xs text-gray-400 mt-1">
+                Increment (e.g. 1.1, 2.0) when you make significant changes to terms.
+              </p>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium mb-1">
+                Terms Content (Markdown)
+              </label>
+              <textarea
+                value={settings.terms_content || ""}
+                onChange={(e) => update("terms_content", e.target.value)}
+                rows={12}
+                placeholder="Leave empty to use the default built-in terms. Supports ## headings, **bold**, and - bullet lists."
+                className="block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm font-mono"
+              />
+              <p className="text-xs text-gray-400 mt-1">
+                If empty, the /terms page will display the default built-in terms. Supports basic Markdown: ## Heading, **bold**, - bullet list.
+              </p>
+            </div>
+          </div>
+
           {/* ── Cron Schedule ── */}
           <div className="border-t pt-4">
             <label className="block text-sm font-semibold mb-1">

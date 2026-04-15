@@ -1,18 +1,12 @@
 import Link from "next/link";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { PublicLayout } from "@/components/public-layout";
 
 export default function CancelPage() {
   return (
-    <div className="min-h-screen flex flex-col">
-      <header className="bg-blue-900 text-white">
-        <div className="max-w-6xl mx-auto px-4 py-4">
-          <Link href="/" className="text-2xl font-bold tracking-tight">
-            CertExpress
-          </Link>
-        </div>
-      </header>
-      <main className="flex-1 flex items-center justify-center py-10 px-4">
+    <PublicLayout>
+      <div className="flex-1 flex items-center justify-center py-10 px-4">
         <div className="max-w-md w-full">
           <Card className="text-center py-10">
             <div className="mx-auto w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mb-4">
@@ -41,7 +35,7 @@ export default function CancelPage() {
             </Link>
           </Card>
         </div>
-      </main>
-    </div>
+      </div>
+    </PublicLayout>
   );
 }

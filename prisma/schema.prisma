@@ -63,9 +63,12 @@ model Order {
   downloadToken String    @unique @default(uuid())
   downloadCount Int       @default(0)
   maxDownloads  Int       @default(5)
-  expiresAt     DateTime
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  expiresAt        DateTime
+  ipAddress        String?
+  termsAcceptedAt  DateTime?
+  termsVersion     String?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
 
   @@index([paymentId])
   @@index([downloadToken])

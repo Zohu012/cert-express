@@ -5,7 +5,11 @@ import { getPriceCents } from "@/lib/settings";
 
 export async function POST(req: NextRequest) {
   try {
-    const { companyId } = await req.json();
+    const { companyId, termsAcceptedAt, termsVersion } = await req.json();
+    const ipAddress =
+      req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+      req.headers.get("x-real-ip") ||
+      null;
 
     const company = await prisma.company.findUnique({
       where: { id: companyId },
@@ -25,6 +29,9 @@ export async function POST(req: NextRequest) {
         paymentMethod: "paypal",
         status: "pending",
         expiresAt: new Date(Date.now() + 72 * 60 * 60 * 1000),
+        ipAddress,
+        termsAcceptedAt: termsAcceptedAt ? new Date(termsAcceptedAt) : null,
+        termsVersion: termsVersion || null,
       },
     });
 
