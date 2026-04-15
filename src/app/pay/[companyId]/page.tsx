@@ -95,7 +95,7 @@ export default async function PayPage({
                 <div>
                   <span className="text-gray-500">Source:</span>
                   <br />
-                  <span className="text-gray-700">Public FMCSA registry</span>
+                  <span className="text-gray-700">FMCSA registry</span>
                 </div>
               </div>
               {company.streetAddress && (
