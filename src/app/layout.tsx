@@ -5,6 +5,11 @@ export const metadata: Metadata = {
   title: "CertExpress - FMCSA Certificate Delivery",
   description:
     "Get your FMCSA Certificate of Authority delivered instantly. Search by USDOT Number, MC/MX Number, or Company Name.",
+  icons: {
+    icon: "/logo_icon.png",
+    shortcut: "/logo_icon.png",
+    apple: "/logo_icon.png",
+  },
 };
 
 export default function RootLayout({
