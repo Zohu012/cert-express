@@ -19,11 +19,17 @@ export default async function PayPage({
 
   if (!company || !company.pdfFilename) return notFound();
 
-  const [priceCents, termsVersion] = await Promise.all([
+  const [priceCents, termsVersion, initialPriceRaw] = await Promise.all([
     getPriceCents(),
     getSetting("terms_version"),
+    getSetting("initial_price_cents"),
   ]);
   const priceDisplay = (priceCents / 100).toFixed(2);
+  const initialPriceCents = initialPriceRaw ? parseInt(initialPriceRaw) : null;
+  const initialPriceDisplay =
+    initialPriceCents && initialPriceCents > priceCents
+      ? (initialPriceCents / 100).toFixed(2)
+      : null;
 
   return (
     <PublicLayout>
@@ -102,8 +108,18 @@ export default async function PayPage({
 
             {/* Price */}
             <div className="text-center mb-4">
+              {initialPriceDisplay && (
+                <p className="text-xl font-semibold text-red-500 line-through leading-tight">
+                  ${initialPriceDisplay}
+                </p>
+              )}
               <p className="text-3xl font-bold text-green-700">
                 ${priceDisplay}
+                {initialPriceDisplay && (
+                  <span className="ml-2 text-sm font-semibold bg-green-100 text-green-700 px-2 py-0.5 rounded-full align-middle">
+                    Save ${(initialPriceCents! / 100 - priceCents / 100).toFixed(2)}
+                  </span>
+                )}
               </p>
               <p className="text-sm text-gray-500 mt-1">
                 One-time payment · Service fee for document retrieval &amp; delivery

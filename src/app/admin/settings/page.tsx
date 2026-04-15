@@ -53,7 +53,37 @@ export default function SettingsPage() {
         <Card className="space-y-6">
           <div>
             <label className="block text-sm font-medium mb-1">
-              Certificate Price ($)
+              Initial Price ($){" "}
+              <span className="text-xs font-normal text-gray-400">
+                — shown crossed out on payment page (leave blank to hide)
+              </span>
+            </label>
+            <Input
+              type="number"
+              step="0.01"
+              min="0"
+              placeholder="e.g. 79.99"
+              value={
+                settings.initial_price_cents
+                  ? (parseInt(settings.initial_price_cents) / 100).toFixed(2)
+                  : ""
+              }
+              onChange={(e) => {
+                const raw = e.target.value;
+                update(
+                  "initial_price_cents",
+                  raw === "" ? "" : String(Math.round(parseFloat(raw) * 100))
+                );
+              }}
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-1">
+              Certificate Price ($){" "}
+              <span className="text-xs font-normal text-gray-400">
+                — actual charge shown as discounted price
+              </span>
             </label>
             <Input
               type="number"
