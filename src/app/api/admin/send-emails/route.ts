@@ -8,7 +8,8 @@ import { sendEmail } from "@/lib/email";
 function templateToHtml(
   text: string,
   paymentLink: string,
-  appUrl: string
+  appUrl: string,
+  openPixelUrl?: string
 ): string {
   const logoUrl = `${appUrl}/logo.png`;
 
@@ -104,6 +105,7 @@ function templateToHtml(
       </table>
     </td></tr>
   </table>
+  ${openPixelUrl ? `<img src="${openPixelUrl}" width="1" height="1" style="display:none;border:0;" alt="" />` : ""}
 </body>
 </html>`;
 }
@@ -161,8 +163,9 @@ export async function POST(req: NextRequest) {
         },
       });
 
-      // 2. Use tracking URL so clicks are recorded
+      // 2. Use tracking URL so clicks are recorded; open pixel for read receipts
       const trackingUrl = `${appUrl}/api/track/${emailLog.id}`;
+      const openPixelUrl = `${appUrl}/api/track/open/${emailLog.id}`;
 
       const interpolate = (tpl: string) =>
         tpl
@@ -187,7 +190,7 @@ export async function POST(req: NextRequest) {
 
       const template = settings.email_body_template || DEFAULT_TEMPLATE;
       const textBody = interpolate(template);
-      const htmlBody = templateToHtml(textBody, trackingUrl, appUrl);
+      const htmlBody = templateToHtml(textBody, trackingUrl, appUrl, openPixelUrl);
 
       await sendEmail({
         to: company.email,

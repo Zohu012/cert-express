@@ -10,6 +10,7 @@ import Link from "next/link";
 // ─── Sortable columns ────────────────────────────────────────────────────────
 const SORTABLE_COLS = [
   "sentAt", "toEmail", "subject", "clickCount", "lastClickAt",
+  "openCount", "firstOpenAt",
 ] as const;
 type SortCol = typeof SORTABLE_COLS[number];
 
@@ -29,6 +30,8 @@ function makeOrderBy(
     subject:     { subject:     dir },
     clickCount:  { clickCount:  dir },
     lastClickAt: { lastClickAt: dir },
+    openCount:   { openCount:   dir },
+    firstOpenAt: { firstOpenAt: dir },
   };
   return map[col];
 }
@@ -39,20 +42,21 @@ export default async function EmailHistoryPage({
 }: {
   searchParams: Promise<{
     page?: string; q?: string; date?: string;
-    sort?: string; dir?: string; clicks?: string;
+    sort?: string; dir?: string; clicks?: string; opened?: string;
   }>;
 }) {
   const adminId = await verifySession();
   if (!adminId) redirect("/admin/login");
 
-  const params      = await searchParams;
-  const page        = Math.max(1, parseInt(params.page || "1"));
-  const query       = params.q      || "";
-  const dateFilter  = params.date   || "";
-  const clickFilter = params.clicks || ""; // "yes" | "no" | ""
-  const sortBy      = toSortCol(params.sort);
-  const sortDir     = params.dir === "asc" ? "asc" : "desc";
-  const perPage     = 50;
+  const params        = await searchParams;
+  const page          = Math.max(1, parseInt(params.page || "1"));
+  const query         = params.q      || "";
+  const dateFilter    = params.date   || "";
+  const clickFilter   = params.clicks || ""; // "yes" | "no" | ""
+  const openedFilter  = params.opened || ""; // "yes" | "no" | ""
+  const sortBy        = toSortCol(params.sort);
+  const sortDir       = params.dir === "asc" ? "asc" : "desc";
+  const perPage       = 50;
 
   // Build where clause
   const where: Prisma.EmailLogWhereInput = {};
@@ -74,6 +78,11 @@ export default async function EmailHistoryPage({
   } else if (clickFilter === "no") {
     where.clickCount = 0;
   }
+  if (openedFilter === "yes") {
+    where.openCount = { gt: 0 };
+  } else if (openedFilter === "no") {
+    where.openCount = 0;
+  }
 
   const [logs, total] = await Promise.all([
     prisma.emailLog.findMany({
@@ -88,21 +97,21 @@ export default async function EmailHistoryPage({
 
   const totalPages = Math.ceil(total / perPage);
 
-  // Total click stats
-  const totalClicks = await prisma.emailLog.aggregate({
-    _sum: { clickCount: true },
-  });
-  const clickedCount = await prisma.emailLog.count({
-    where: { clickCount: { gt: 0 } },
-  });
+  // Total click + open stats
+  const [totalClicks, clickedCount, openedCount] = await Promise.all([
+    prisma.emailLog.aggregate({ _sum: { clickCount: true } }),
+    prisma.emailLog.count({ where: { clickCount: { gt: 0 } } }),
+    prisma.emailLog.count({ where: { openCount: { gt: 0 } } }),
+  ]);
 
   function buildUrl(overrides: Record<string, string | number>) {
     const base: Record<string, string> = {
       sort: sortBy, dir: sortDir, page: String(page),
     };
-    if (query)       base.q      = query;
-    if (dateFilter)  base.date   = dateFilter;
-    if (clickFilter) base.clicks = clickFilter;
+    if (query)        base.q      = query;
+    if (dateFilter)   base.date   = dateFilter;
+    if (clickFilter)  base.clicks = clickFilter;
+    if (openedFilter) base.opened = openedFilter;
     const merged = { ...base, ...overrides };
     return (
       "/admin/emails/history?" +
@@ -131,7 +140,7 @@ export default async function EmailHistoryPage({
     );
   }
 
-  const hasFilters = query || dateFilter || clickFilter;
+  const hasFilters = query || dateFilter || clickFilter || openedFilter;
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-8">
@@ -142,9 +151,9 @@ export default async function EmailHistoryPage({
             Email Offer History ({total.toLocaleString()})
           </h1>
           <p className="text-sm text-gray-500 mt-1">
-            Total clicks: <strong>{totalClicks._sum.clickCount ?? 0}</strong>
-            {" · "}Emails with at least 1 click:{" "}
-            <strong>{clickedCount}</strong>
+            Opened: <strong>{openedCount}</strong>
+            {" · "}Total clicks: <strong>{totalClicks._sum.clickCount ?? 0}</strong>
+            {" · "}Emails with ≥1 click: <strong>{clickedCount}</strong>
           </p>
         </div>
         <Link
@@ -183,6 +192,15 @@ export default async function EmailHistoryPage({
             <option value="">All Clicks</option>
             <option value="yes">Has Clicks</option>
             <option value="no">No Clicks</option>
+          </select>
+          <select
+            name="opened"
+            defaultValue={openedFilter}
+            className="rounded-lg border border-gray-300 px-3 py-2 text-sm"
+          >
+            <option value="">All Opens</option>
+            <option value="yes">Opened</option>
+            <option value="no">Not Opened</option>
           </select>
           <input type="hidden" name="sort" value={sortBy} />
           <input type="hidden" name="dir"  value={sortDir} />
@@ -229,6 +247,18 @@ export default async function EmailHistoryPage({
                 <a href={buildUrl({ clicks: "", page: 1 })} className="ml-1 hover:text-orange-600">✕</a>
               </span>
             )}
+            {openedFilter === "yes" && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-teal-100 text-teal-800 text-xs rounded-full">
+                Opened
+                <a href={buildUrl({ opened: "", page: 1 })} className="ml-1 hover:text-teal-600">✕</a>
+              </span>
+            )}
+            {openedFilter === "no" && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-red-100 text-red-800 text-xs rounded-full">
+                Not Opened
+                <a href={buildUrl({ opened: "", page: 1 })} className="ml-1 hover:text-red-600">✕</a>
+              </span>
+            )}
           </div>
         )}
       </Card>
@@ -242,6 +272,7 @@ export default async function EmailHistoryPage({
               <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase">Company</th>
               <SortHeader col="toEmail"     label="Email" />
               <SortHeader col="subject"     label="Subject" />
+              <SortHeader col="openCount"   label="Opened" />
               <SortHeader col="clickCount"  label="Clicks" />
               <SortHeader col="lastClickAt" label="Last Click" />
             </tr>
@@ -249,14 +280,15 @@ export default async function EmailHistoryPage({
           <tbody className="divide-y divide-gray-100">
             {logs.length === 0 && (
               <tr>
-                <td colSpan={6} className="px-3 py-8 text-center text-gray-400">
+                <td colSpan={7} className="px-3 py-8 text-center text-gray-400">
                   No email logs found.
                 </td>
               </tr>
             )}
             {logs.map((log) => {
-              const sentDate = new Date(log.sentAt);
+              const sentDate  = new Date(log.sentAt);
               const lastClick = log.lastClickAt ? new Date(log.lastClickAt) : null;
+              const firstOpen = log.firstOpenAt ? new Date(log.firstOpenAt) : null;
               return (
                 <tr key={log.id} className="hover:bg-gray-50 transition">
                   <td className="px-3 py-2 whitespace-nowrap text-gray-600">
@@ -273,6 +305,21 @@ export default async function EmailHistoryPage({
                   </td>
                   <td className="px-3 py-2 text-gray-600 max-w-[200px] truncate" title={log.subject}>
                     {log.subject}
+                  </td>
+                  <td className="px-3 py-2 whitespace-nowrap">
+                    {firstOpen ? (
+                      <span className="inline-flex flex-col items-start gap-0.5">
+                        <span className="inline-flex items-center gap-1 text-teal-700 font-semibold text-xs">
+                          ✓ Opened
+                        </span>
+                        <span className="text-gray-400 text-xs">
+                          {firstOpen.toLocaleDateString("en-US")}{" "}
+                          {firstOpen.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}
+                        </span>
+                      </span>
+                    ) : (
+                      <span className="text-gray-400 text-xs">—</span>
+                    )}
                   </td>
                   <td className="px-3 py-2">
                     <span

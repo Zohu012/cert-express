@@ -85,6 +85,8 @@ model EmailLog {
   sentAt      DateTime  @default(now())
   clickCount  Int       @default(0)
   lastClickAt DateTime?
+  openCount   Int       @default(0)
+  firstOpenAt DateTime?
 
   @@index([companyId])
   @@index([sentAt])
