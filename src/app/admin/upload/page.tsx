@@ -235,36 +235,71 @@ function FetchFromFMCSA() {
 
 function GeneratePreviews() {
   const [pending, setPending] = useState<number | null>(null);
+  const [total, setTotal] = useState<number | null>(null);
   const [running, setRunning] = useState(false);
-  const [result, setResult] = useState<{ generated: number; total: number } | null>(null);
+  const [done, setDone] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  useEffect(() => {
+  function fetchPending() {
     fetch("/api/admin/generate-documents")
       .then((r) => r.json())
       .then((d) => setPending(d.pending ?? null))
       .catch(() => {});
+  }
+
+  useEffect(() => {
+    fetchPending();
+    return () => { if (pollRef.current) clearInterval(pollRef.current); };
   }, []);
+
+  function startPolling(startPending: number) {
+    if (pollRef.current) clearInterval(pollRef.current);
+    pollRef.current = setInterval(() => {
+      fetch("/api/admin/generate-documents")
+        .then((r) => r.json())
+        .then((d) => {
+          const p = d.pending ?? 0;
+          setPending(p);
+          if (p === 0) {
+            clearInterval(pollRef.current!);
+            pollRef.current = null;
+            setRunning(false);
+            setDone(true);
+          }
+        })
+        .catch(() => {});
+    }, 3000);
+    // suppress unused var warning
+    void startPending;
+  }
 
   async function handleGenerate() {
     setRunning(true);
+    setDone(false);
     setError(null);
-    setResult(null);
     try {
       const res = await fetch("/api/admin/generate-documents", { method: "POST" });
       const data = await res.json();
       if (data.error) {
         setError(data.error);
+        setRunning(false);
+      } else if (data.started) {
+        setTotal(data.total);
+        startPolling(data.total);
       } else {
-        setResult({ generated: data.generated, total: data.total ?? data.generated });
+        // nothing pending
         setPending(0);
+        setRunning(false);
+        setDone(true);
       }
     } catch {
       setError("Network error. Please try again.");
-    } finally {
       setRunning(false);
     }
   }
+
+  const generated = total !== null && pending !== null ? Math.max(0, total - pending) : null;
 
   return (
     <Card className="mb-6">
@@ -281,26 +316,38 @@ function GeneratePreviews() {
         <Button onClick={handleGenerate} disabled={running || pending === 0}>
           {running ? "Generating..." : "Generate Now"}
         </Button>
-        {pending !== null && (
+        {!running && pending !== null && (
           <span className="text-sm text-gray-500">
             {pending === 0
               ? "All previews up to date."
               : `${pending} compan${pending === 1 ? "y needs" : "ies need"} a preview.`}
           </span>
         )}
+        {running && total !== null && generated !== null && (
+          <span className="text-sm text-blue-600 font-medium">
+            {generated} / {total} generated…
+          </span>
+        )}
       </div>
 
       {running && (
         <div className="mt-3 w-full bg-gray-100 rounded-full h-3 overflow-hidden">
-          <div className="h-3 w-full bg-green-500 rounded-full animate-pulse" />
+          {total && generated !== null && total > 0 ? (
+            <div
+              className="h-3 bg-green-500 rounded-full transition-all duration-500"
+              style={{ width: `${Math.round((generated / total) * 100)}%` }}
+            />
+          ) : (
+            <div className="h-3 w-full bg-green-500 rounded-full animate-pulse" />
+          )}
         </div>
       )}
 
-      {result && (
+      {done && (
         <div className="mt-3 flex items-center gap-2 p-3 bg-green-50 border border-green-200 rounded-lg">
           <span className="text-green-600">✓</span>
           <p className="text-sm text-green-700 font-medium">
-            Generated {result.generated} preview{result.generated !== 1 ? "s" : ""}.
+            All previews generated.
           </p>
         </div>
       )}

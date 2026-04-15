@@ -15,20 +15,23 @@ export async function POST() {
   });
 
   if (companies.length === 0) {
-    return NextResponse.json({ generated: 0, message: "All companies already have previews." });
+    return NextResponse.json({ started: false, message: "All companies already have previews.", pending: 0 });
   }
 
-  const previewMap = await generateDocuments(companies);
+  // Fire-and-forget — returns immediately so the HTTP request doesn't time out
+  generateDocuments(companies)
+    .then((previewMap) => {
+      if (previewMap.size === 0) return;
+      return prisma.$transaction(
+        [...previewMap.entries()].map(([id, previewFilename]) =>
+          prisma.company.update({ where: { id }, data: { previewFilename } })
+        )
+      );
+    })
+    .then(() => console.log(`[Document Generator] Batch complete — ${companies.length} processed`))
+    .catch((err) => console.error("[Document Generator] Batch failed:", err));
 
-  if (previewMap.size > 0) {
-    await prisma.$transaction(
-      [...previewMap.entries()].map(([id, previewFilename]) =>
-        prisma.company.update({ where: { id }, data: { previewFilename } })
-      )
-    );
-  }
-
-  return NextResponse.json({ generated: previewMap.size, total: companies.length });
+  return NextResponse.json({ started: true, total: companies.length });
 }
 
 export async function GET() {
