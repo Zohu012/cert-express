@@ -12,11 +12,17 @@ export function PaymentButtons({
   termsVersion?: string;
 }) {
   const [agreed, setAgreed] = useState(false);
+  const [showTermsError, setShowTermsError] = useState(false);
   const [loading, setLoading] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  function requireAgreed() {
+    if (!agreed) { setShowTermsError(true); return false; }
+    return true;
+  }
+
   async function handleStripe() {
-    if (!agreed) return;
+    if (!requireAgreed()) return;
     setLoading("stripe");
     setError(null);
     try {
@@ -43,7 +49,7 @@ export function PaymentButtons({
   }
 
   async function handlePayPal() {
-    if (!agreed) return;
+    if (!requireAgreed()) return;
     setLoading("paypal");
     setError(null);
     try {
@@ -72,12 +78,14 @@ export function PaymentButtons({
   return (
     <div className="space-y-4">
       {/* Mandatory consent checkbox */}
-      <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+      <div className={`bg-gray-50 rounded-lg p-4 border-2 transition-colors ${
+        showTermsError && !agreed ? "border-red-500" : "border-transparent"
+      }`}>
         <label className="flex items-start gap-3 cursor-pointer">
           <input
             type="checkbox"
             checked={agreed}
-            onChange={(e) => setAgreed(e.target.checked)}
+            onChange={(e) => { setAgreed(e.target.checked); if (e.target.checked) setShowTermsError(false); }}
             className="mt-0.5 h-4 w-4 rounded border-gray-300 text-blue-600 flex-shrink-0"
           />
           <span className="text-sm text-gray-700 leading-relaxed">
@@ -102,9 +110,9 @@ export function PaymentButtons({
         </label>
       </div>
 
-      {!agreed && (
-        <p className="text-xs text-center text-amber-600">
-          Please accept the terms above to continue with payment.
+      {showTermsError && !agreed && (
+        <p className="text-sm font-medium text-center text-red-600">
+          ⚠ Please accept the Terms of Service to continue.
         </p>
       )}
 
@@ -116,7 +124,7 @@ export function PaymentButtons({
 
       <Button
         onClick={handleStripe}
-        disabled={!agreed || loading !== null}
+        disabled={loading !== null}
         className="w-full !py-3 !text-base"
       >
         {loading === "stripe" ? "Redirecting..." : "Pay with Card (Stripe)"}
@@ -124,7 +132,7 @@ export function PaymentButtons({
 
       <Button
         onClick={handlePayPal}
-        disabled={!agreed || loading !== null}
+        disabled={loading !== null}
         variant="secondary"
         className="w-full !py-3 !text-base !bg-yellow-400 !text-black hover:!bg-yellow-500 disabled:!opacity-50"
       >
