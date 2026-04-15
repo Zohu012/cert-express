@@ -79,7 +79,7 @@ model Order {
 model EmailLog {
   id          String    @id @default(uuid())
   companyId   String
-  company     Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  company     Company   @relation(fields: [companyId], references: [id], onDelete: Restrict)
   toEmail     String
   subject     String
   sentAt      DateTime  @default(now())
