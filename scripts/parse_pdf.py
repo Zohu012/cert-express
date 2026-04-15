@@ -163,13 +163,13 @@ def parse_envelope_page(text: str) -> dict:
     return data
 
 
-def process_pdf(input_path: str, output_dir: str) -> list[dict]:
-    """Process the full PDF and split into per-company files."""
+def process_pdf(input_path: str, output_dir: str) -> int:
+    """Process the full PDF, split into per-company files, and stream each as a JSON line."""
     os.makedirs(output_dir, exist_ok=True)
 
     reader = PdfReader(input_path)
     total_pages = len(reader.pages)
-    companies = []
+    count = 0
 
     with pdfplumber.open(input_path) as pdf:
         for i in range(0, total_pages - 1, 2):
@@ -207,7 +207,10 @@ def process_pdf(input_path: str, output_dir: str) -> list[dict]:
                     writer.write(f)
 
                 company["pdfFilename"] = filename
-                companies.append(company)
+
+                # Emit immediately so Node.js can start DB inserts without waiting
+                print(json.dumps(company), flush=True)
+                count += 1
 
             except Exception as e:
                 print(
@@ -216,7 +219,7 @@ def process_pdf(input_path: str, output_dir: str) -> list[dict]:
                 )
                 continue
 
-    return companies
+    return count
 
 
 def main():
@@ -231,9 +234,8 @@ def main():
         print(f"Error: File not found: {input_path}", file=sys.stderr)
         sys.exit(1)
 
-    companies = process_pdf(input_path, output_dir)
-    print(json.dumps(companies, indent=2))
-    print(f"Processed {len(companies)} companies", file=sys.stderr)
+    count = process_pdf(input_path, output_dir)
+    print(f"Processed {count} companies", file=sys.stderr)
 
 
 if __name__ == "__main__":
