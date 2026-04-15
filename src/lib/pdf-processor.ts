@@ -23,34 +23,37 @@ export async function processPdf(sourcePdfId: string, filePath: string) {
     await runPythonParser(
       filePath,
       async (batch) => {
-        for (const company of batch) {
-          const commonData = {
-            companyName: company.companyName,
-            dbaName: company.dbaName ?? null,
-            streetAddress: company.streetAddress ?? null,
-            city: company.city ?? null,
-            state: company.state ?? null,
-            zipCode: company.zipCode ?? null,
-            documentType: company.documentType,
-            serviceDate: new Date(company.serviceDate),
-            pdfFilename: company.pdfFilename,
-            sourcePdfId,
-          };
-          await prisma.company.upsert({
-            where: {
-              usdotNumber_documentNumber: {
+        // Single transaction = 1 SQLite fsync for all upserts in the batch
+        await prisma.$transaction(
+          batch.map((company) => {
+            const commonData = {
+              companyName: company.companyName,
+              dbaName: company.dbaName ?? null,
+              streetAddress: company.streetAddress ?? null,
+              city: company.city ?? null,
+              state: company.state ?? null,
+              zipCode: company.zipCode ?? null,
+              documentType: company.documentType,
+              serviceDate: new Date(company.serviceDate),
+              pdfFilename: company.pdfFilename,
+              sourcePdfId,
+            };
+            return prisma.company.upsert({
+              where: {
+                usdotNumber_documentNumber: {
+                  usdotNumber: company.usdotNumber,
+                  documentNumber: company.documentNumber,
+                },
+              },
+              update: commonData,
+              create: {
+                ...commonData,
                 usdotNumber: company.usdotNumber,
                 documentNumber: company.documentNumber,
               },
-            },
-            update: commonData,
-            create: {
-              ...commonData,
-              usdotNumber: company.usdotNumber,
-              documentNumber: company.documentNumber,
-            },
-          });
-        }
+            });
+          })
+        );
         totalInserted += batch.length;
         // Update live progress so the UI polling can show %
         await prisma.sourcePdf.update({
