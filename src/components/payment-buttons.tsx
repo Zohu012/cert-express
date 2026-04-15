@@ -130,14 +130,7 @@ export function PaymentButtons({
         {loading === "stripe" ? "Redirecting..." : "Pay with Card (Stripe)"}
       </Button>
 
-      <Button
-        onClick={handlePayPal}
-        disabled={loading !== null}
-        variant="secondary"
-        className="w-full !py-3 !text-base !bg-yellow-400 !text-black hover:!bg-yellow-500 disabled:!opacity-50"
-      >
-        {loading === "paypal" ? "Redirecting..." : "Pay with PayPal"}
-      </Button>
+      {/* PayPal hidden while account is under review */}
 
       <p className="text-xs text-gray-400 text-center mt-2">
         Secure payment processing. Your document will be available for
