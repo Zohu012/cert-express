@@ -14,44 +14,57 @@ const SAFETY_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes
 export async function processPdf(sourcePdfId: string, filePath: string) {
   await prisma.sourcePdf.update({
     where: { id: sourcePdfId },
-    data: { status: "processing" },
+    data: { status: "processing", companyCount: 0, totalPages: 0 },
   });
 
   try {
     let totalInserted = 0;
 
-    await runPythonParser(filePath, async (batch) => {
-      for (const company of batch) {
-        const commonData = {
-          companyName: company.companyName,
-          dbaName: company.dbaName ?? null,
-          streetAddress: company.streetAddress ?? null,
-          city: company.city ?? null,
-          state: company.state ?? null,
-          zipCode: company.zipCode ?? null,
-          documentType: company.documentType,
-          serviceDate: new Date(company.serviceDate),
-          pdfFilename: company.pdfFilename,
-          sourcePdfId,
-        };
-        await prisma.company.upsert({
-          where: {
-            usdotNumber_documentNumber: {
+    await runPythonParser(
+      filePath,
+      async (batch) => {
+        for (const company of batch) {
+          const commonData = {
+            companyName: company.companyName,
+            dbaName: company.dbaName ?? null,
+            streetAddress: company.streetAddress ?? null,
+            city: company.city ?? null,
+            state: company.state ?? null,
+            zipCode: company.zipCode ?? null,
+            documentType: company.documentType,
+            serviceDate: new Date(company.serviceDate),
+            pdfFilename: company.pdfFilename,
+            sourcePdfId,
+          };
+          await prisma.company.upsert({
+            where: {
+              usdotNumber_documentNumber: {
+                usdotNumber: company.usdotNumber,
+                documentNumber: company.documentNumber,
+              },
+            },
+            update: commonData,
+            create: {
+              ...commonData,
               usdotNumber: company.usdotNumber,
               documentNumber: company.documentNumber,
             },
-          },
-          update: commonData,
-          create: {
-            ...commonData,
-            usdotNumber: company.usdotNumber,
-            documentNumber: company.documentNumber,
-          },
+          });
+        }
+        totalInserted += batch.length;
+        // Update live progress so the UI polling can show %
+        await prisma.sourcePdf.update({
+          where: { id: sourcePdfId },
+          data: { companyCount: totalInserted },
         });
+        console.log(`[PDF Processor] Upserted ${totalInserted} companies so far...`);
+      },
+      (totalPages) => {
+        prisma.sourcePdf
+          .update({ where: { id: sourcePdfId }, data: { totalPages } })
+          .catch((err) => console.error("[PDF Processor] Failed to store totalPages:", err));
       }
-      totalInserted += batch.length;
-      console.log(`[PDF Processor] Upserted ${totalInserted} companies so far...`);
-    });
+    );
 
     const companyCount = await prisma.company.count({ where: { sourcePdfId } });
 
@@ -80,7 +93,8 @@ export async function processPdf(sourcePdfId: string, filePath: string) {
 
 function runPythonParser(
   filePath: string,
-  onBatch: (companies: ParsedCompany[]) => Promise<void>
+  onBatch: (companies: ParsedCompany[]) => Promise<void>,
+  onTotalPages?: (n: number) => void
 ): Promise<void> {
   return new Promise((resolve, reject) => {
     const proc = spawn(PYTHON_PATH, [SCRIPT_PATH, filePath, OUTPUT_DIR]);
@@ -101,8 +115,14 @@ function runPythonParser(
     }, SAFETY_TIMEOUT_MS);
 
     proc.stderr.on("data", (d: Buffer) => {
-      stderrBuf += d.toString();
-      console.log("[PDF Parser]", d.toString().trimEnd());
+      const text = d.toString();
+      stderrBuf += text;
+      // Parse total page count emitted early by Python
+      const match = text.match(/TOTAL_PAGES:(\d+)/);
+      if (match && onTotalPages) {
+        onTotalPages(parseInt(match[1], 10));
+      }
+      console.log("[PDF Parser]", text.trimEnd());
     });
 
     rl.on("line", (line: string) => {

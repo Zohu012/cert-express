@@ -169,6 +169,7 @@ def process_pdf(input_path: str, output_dir: str) -> int:
 
     reader = PdfReader(input_path)
     total_pages = len(reader.pages)
+    print(f"TOTAL_PAGES:{total_pages}", file=sys.stderr, flush=True)
     count = 0
 
     with pdfplumber.open(input_path) as pdf:

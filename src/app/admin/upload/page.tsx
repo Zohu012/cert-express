@@ -12,7 +12,7 @@ type FetchState =
   | { phase: "fetching" }
   | { phase: "not_found" }
   | { phase: "already_exists"; sourcePdfId: string; pdfStatus: string; companyCount: number | null }
-  | { phase: "processing"; sourcePdfId: string; companyCount: number | null }
+  | { phase: "processing"; sourcePdfId: string; companyCount: number | null; totalPages: number | null }
   | { phase: "completed"; companyCount: number }
   | { phase: "failed"; message: string };
 
@@ -44,7 +44,12 @@ function FetchFromFMCSA() {
           stopPolling();
           setState({ phase: "failed", message: data.error || "Processing failed" });
         } else {
-          setState({ phase: "processing", sourcePdfId, companyCount: data.companyCount ?? null });
+          setState({
+            phase: "processing",
+            sourcePdfId,
+            companyCount: data.companyCount ?? null,
+            totalPages: data.totalPages ?? null,
+          });
         }
       } catch {
         // keep polling on transient errors
@@ -74,7 +79,7 @@ function FetchFromFMCSA() {
             companyCount: data.companyCount,
           });
         } else if (data.pdfStatus === "processing" || data.pdfStatus === "pending") {
-          setState({ phase: "processing", sourcePdfId: data.sourcePdfId, companyCount: null });
+          setState({ phase: "processing", sourcePdfId: data.sourcePdfId, companyCount: null, totalPages: null });
           startPolling(data.sourcePdfId);
         } else {
           setState({
@@ -85,7 +90,7 @@ function FetchFromFMCSA() {
           });
         }
       } else if (data.status === "downloaded") {
-        setState({ phase: "processing", sourcePdfId: data.sourcePdfId, companyCount: null });
+        setState({ phase: "processing", sourcePdfId: data.sourcePdfId, companyCount: null, totalPages: null });
         startPolling(data.sourcePdfId);
       } else {
         setState({ phase: "failed", message: data.error || "Unexpected error" });
@@ -97,12 +102,29 @@ function FetchFromFMCSA() {
 
   const busy = state.phase === "fetching" || state.phase === "processing";
 
-  // Indeterminate progress bar animation
-  const progressBar = (
-    <div className="w-full bg-gray-100 rounded-full h-2 overflow-hidden mt-3">
-      <div className="h-2 w-full bg-blue-500 rounded-full animate-pulse" />
-    </div>
-  );
+  function ProgressBar({ pct }: { pct: number | null }) {
+    if (pct !== null) {
+      return (
+        <div className="mt-3">
+          <div className="flex justify-between text-xs text-gray-500 mb-1">
+            <span>Processing…</span>
+            <span className="font-semibold text-blue-600">{pct}%</span>
+          </div>
+          <div className="w-full bg-gray-100 rounded-full h-3 overflow-hidden">
+            <div
+              className="h-3 bg-blue-500 rounded-full transition-all duration-500"
+              style={{ width: `${pct}%` }}
+            />
+          </div>
+        </div>
+      );
+    }
+    return (
+      <div className="w-full bg-gray-100 rounded-full h-3 overflow-hidden mt-3">
+        <div className="h-3 w-full bg-blue-500 rounded-full animate-pulse" />
+      </div>
+    );
+  }
 
   return (
     <Card className="mb-6">
@@ -134,26 +156,31 @@ function FetchFromFMCSA() {
       {state.phase === "fetching" && (
         <div className="mt-3">
           <p className="text-sm text-blue-600">Contacting FMCSA server...</p>
-          {progressBar}
+          <ProgressBar pct={null} />
         </div>
       )}
 
-      {state.phase === "processing" && (
-        <div className="mt-3">
-          <div className="flex items-center justify-between">
-            <p className="text-sm text-blue-600">
-              Parsing PDF &amp; saving companies...
-            </p>
-            {state.companyCount !== null && state.companyCount > 0 && (
-              <span className="text-xs font-medium bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full">
-                {state.companyCount} saved so far
-              </span>
-            )}
+      {state.phase === "processing" && (() => {
+        const expectedTotal = state.totalPages ? Math.floor(state.totalPages / 2) : null;
+        const pct =
+          expectedTotal && expectedTotal > 0 && state.companyCount !== null
+            ? Math.min(99, Math.round((state.companyCount / expectedTotal) * 100))
+            : null;
+        return (
+          <div className="mt-3">
+            <div className="flex items-center justify-between mb-1">
+              <p className="text-sm text-blue-600">Parsing PDF &amp; saving companies...</p>
+              {state.companyCount !== null && state.companyCount > 0 && (
+                <span className="text-xs font-medium bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full">
+                  {state.companyCount}{expectedTotal ? ` / ${expectedTotal}` : ""} companies
+                </span>
+              )}
+            </div>
+            <ProgressBar pct={pct} />
+            <p className="text-xs text-gray-400 mt-1">This may take several minutes for large PDFs.</p>
           </div>
-          {progressBar}
-          <p className="text-xs text-gray-400 mt-1">This may take several minutes for large PDFs.</p>
-        </div>
-      )}
+        );
+      })()}
 
       {state.phase === "completed" && (
         <div className="mt-3 flex items-center gap-2 p-3 bg-green-50 border border-green-200 rounded-lg">

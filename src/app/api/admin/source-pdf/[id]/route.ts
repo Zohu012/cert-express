@@ -24,6 +24,7 @@ export async function GET(
   return NextResponse.json({
     status: sourcePdf.status,
     companyCount: sourcePdf.companyCount,
+    totalPages: sourcePdf.totalPages,
     error: sourcePdf.error,
   });
 }
