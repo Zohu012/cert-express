@@ -35,9 +35,9 @@ export function PublicLayout({ children }: { children: React.ReactNode }) {
               <Image
                 src="/logo.png"
                 alt="CertExpress"
-                width={140}
-                height={42}
-                className="h-10 w-auto object-contain bg-blue-900 rounded-lg px-2 py-1"
+                width={220}
+                height={66}
+                className="h-16 w-auto object-contain rounded-lg"
               />
             </Link>
           </div>
