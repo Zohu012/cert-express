@@ -16,7 +16,7 @@ from datetime import datetime
 from pypdf import PdfReader, PdfWriter
 
 
-# ── Pre-compiled regex patterns (avoids recompilation on every page) ──────────
+# ── Pre-compiled regex patterns ───────────────────────────────────────────────
 _RE_DATE = re.compile(
     r"(January|February|March|April|May|June|July|August|September|October|November|December)"
     r"\s+\d{1,2},?\s+\d{4}"
@@ -27,11 +27,24 @@ _RE_DOT = re.compile(r"U\.?S\.?\s*DOT\s*No\.?\s*(\d+)")
 _RE_ENV_DOC = re.compile(r"^(MC|FF|MX)-\d+$")
 _RE_CSZ = re.compile(r"^(.+?),\s*([A-Z]{2})\s+(\d{5}(?:-\d{4})?)$")
 _RE_DBA = re.compile(r"^D/?B/?A\s*", re.IGNORECASE)
-_RE_CITY_STATE = re.compile(r"^[A-Z\s]+,\s*[A-Z]{2}$")
+_RE_CITY_STATE = re.compile(r"^[A-Z][A-Z\s]+,\s*[A-Z]{2}$")
+
+# Lines to skip when filtering envelope header boilerplate
+_ENVELOPE_SKIP = re.compile(
+    r"FMCSA|1200 New Jersey|Washington,\s*DC|OFFICIAL BUSINESS|PENALTY FOR"
+)
 
 
 def parse_certificate_page(text: str) -> dict:
-    """Parse odd page (certificate/permit/license) for company data."""
+    """Parse odd page (certificate/permit/license) for company data.
+
+    pypdf text order for this page:
+      header lines → SERVICE DATE → LICENSE → MC-XXXXX-B → company name →
+      city, STATE → body text → signature → U.S. DOT No. XXXXXX
+
+    The DOT number appears at the BOTTOM of the page in pypdf's stream order,
+    so we anchor company-name extraction on the document number line instead.
+    """
     data = {
         "serviceDate": None,
         "documentType": None,
@@ -67,18 +80,21 @@ def parse_certificate_page(text: str) -> dict:
         if doc_match:
             data["documentNumber"] = doc_match.group(1)
 
-    # USDOT Number
+    # USDOT Number — scan entire page (may appear anywhere in stream order)
     for line in lines:
         dot_match = _RE_DOT.search(line)
         if dot_match:
             data["usdotNumber"] = dot_match.group(1)
             break
 
-    # Company name and DBA — appears after DOT number line
-    dot_found = False
+    # Company name + DBA + city/state
+    # Anchor: lines between the document number (MC-XXXXX-B) and the body text
+    # that starts with "This Permit/Certificate/License/authority".
+    # Skip any DOT number line that may appear in between (pdfplumber order).
+    doc_found = False
     name_lines = []
     for line in lines:
-        if dot_found:
+        if doc_found:
             if any(
                 marker in line
                 for marker in [
@@ -89,9 +105,11 @@ def parse_certificate_page(text: str) -> dict:
                 ]
             ):
                 break
+            if _RE_DOT.search(line):
+                continue  # skip DOT line if it falls between doc# and company (pdfplumber order)
             name_lines.append(line)
-        if "DOT No" in line or "DOT no" in line:
-            dot_found = True
+        elif _RE_DOC_NUM.match(line):
+            doc_found = True
 
     if name_lines:
         data["companyName"] = name_lines[0]
@@ -107,7 +125,18 @@ def parse_certificate_page(text: str) -> dict:
 
 
 def parse_envelope_page(text: str) -> dict:
-    """Parse even page (envelope) for full mailing address."""
+    """Parse even page (envelope) for full mailing address.
+
+    pypdf text order for this page:
+      FMCSA header → OFFICIAL BUSINESS → city, STATE ZIP → street →
+      company name → MC-XXXXXX   (address block is BEFORE the doc number)
+
+    pdfplumber text order (legacy):
+      FMCSA header → MC-XXXXXX → company name → street → city, STATE ZIP
+
+    We try after the doc number first (pdfplumber), fall back to before it
+    reversed (pypdf).
+    """
     data = {
         "streetAddress": None,
         "city": None,
@@ -128,10 +157,18 @@ def parse_envelope_page(text: str) -> dict:
     if doc_idx is None:
         return data
 
-    addr_lines = lines[doc_idx + 1 :]
+    # ── Try pdfplumber order: address lines AFTER doc number ────────────────
+    addr_lines = [l for l in lines[doc_idx + 1 :] if l]
+
+    # ── Fall back to pypdf order: address lines BEFORE doc number, reversed ─
+    if not addr_lines or not any(_RE_CSZ.match(l) for l in addr_lines):
+        pre = [l for l in lines[:doc_idx] if l and not _ENVELOPE_SKIP.search(l)]
+        addr_lines = list(reversed(pre))
+
     if not addr_lines:
         return data
 
+    # Parse: first line = company name, optional DBA, street(s), last line = CSZ
     data["companyName"] = addr_lines[0]
 
     remaining = addr_lines[1:]
@@ -166,8 +203,6 @@ def process_pdf(input_path: str, output_dir: str) -> int:
     print(f"TOTAL_PAGES:{total_pages}", file=sys.stderr, flush=True)
     count = 0
 
-    # Use PdfReader (already open) for both text extraction and splitting —
-    # eliminates the pdfplumber second open, ~3-5x faster for native PDFs
     for i in range(0, total_pages - 1, 2):
         try:
             cert_text = reader.pages[i].extract_text() or ""
@@ -190,7 +225,6 @@ def process_pdf(input_path: str, output_dir: str) -> int:
                 "pdfFilename": None,
             }
 
-            # Split: create 2-page PDF for this company
             filename = f"{uuid.uuid4()}.pdf"
             writer = PdfWriter()
             writer.add_page(reader.pages[i])
@@ -202,7 +236,6 @@ def process_pdf(input_path: str, output_dir: str) -> int:
 
             company["pdfFilename"] = filename
 
-            # Emit immediately so Node.js can start DB inserts without waiting
             print(json.dumps(company), flush=True)
             count += 1
 
