@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 import { Card } from "@/components/ui/card";
 import type { Prisma } from "@prisma/client";
 import Link from "next/link";
+import { DeleteEmailLogButton } from "@/components/delete-email-log-button";
 
 // ─── Sortable columns ────────────────────────────────────────────────────────
 const SORTABLE_COLS = [
@@ -38,55 +39,70 @@ function makeOrderBy(
   return map[col];
 }
 
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+function endOfDay(dateStr: string): Date {
+  const d = new Date(dateStr);
+  d.setDate(d.getDate() + 1);
+  return d;
+}
+
+function pct(num: number, denom: number) {
+  if (denom === 0) return "0.0";
+  return ((num / denom) * 100).toFixed(1);
+}
+
 // ─── Page ─────────────────────────────────────────────────────────────────────
 export default async function EmailHistoryPage({
   searchParams,
 }: {
   searchParams: Promise<{
-    page?: string; q?: string; date?: string;
-    sort?: string; dir?: string; clicks?: string; opened?: string;
+    page?: string; q?: string;
+    dateFrom?: string; dateTo?: string;
+    sort?: string; dir?: string;
+    clicks?: string; opened?: string;
   }>;
 }) {
   const adminId = await verifySession();
   if (!adminId) redirect("/admin/login");
 
-  const params        = await searchParams;
-  const page          = Math.max(1, parseInt(params.page || "1"));
-  const query         = params.q      || "";
-  const dateFilter    = params.date   || "";
-  const clickFilter   = params.clicks || ""; // "yes" | "no" | ""
-  const openedFilter  = params.opened || ""; // "yes" | "no" | ""
-  const sortBy        = toSortCol(params.sort);
-  const sortDir       = params.dir === "asc" ? "asc" : "desc";
-  const perPage       = 50;
+  const params       = await searchParams;
+  const page         = Math.max(1, parseInt(params.page || "1"));
+  const query        = params.q        || "";
+  const dateFrom     = params.dateFrom || "";
+  const dateTo       = params.dateTo   || "";
+  const clickFilter  = params.clicks   || "";
+  const openedFilter = params.opened   || "";
+  const sortBy       = toSortCol(params.sort);
+  const sortDir      = params.dir === "asc" ? "asc" : "desc";
+  const perPage      = 50;
 
-  // Build where clause
+  // ── Build date range sentAt filter ─────────────────────────────────────────
+  function makeSentAtFilter(): Prisma.DateTimeFilter | undefined {
+    if (!dateFrom && !dateTo) return undefined;
+    const f: Prisma.DateTimeFilter = {};
+    if (dateFrom) f.gte = new Date(dateFrom);
+    if (dateTo)   f.lt  = endOfDay(dateTo);
+    return f;
+  }
+
+  // ── Where clause for the main paginated list ────────────────────────────────
   const where: Prisma.EmailLogWhereInput = {};
   if (query) {
     where.OR = [
-      { toEmail:           { contains: query } },
-      { subject:           { contains: query } },
-      { company: { companyName:  { contains: query } } },
-      { company: { usdotNumber:  { contains: query } } },
+      { toEmail:  { contains: query } },
+      { subject:  { contains: query } },
+      { company: { companyName: { contains: query } } },
+      { company: { usdotNumber: { contains: query } } },
     ];
   }
-  if (dateFilter) {
-    const d = new Date(dateFilter);
-    const nextDay = new Date(d);
-    nextDay.setDate(nextDay.getDate() + 1);
-    where.sentAt = { gte: d, lt: nextDay };
-  }
-  if (clickFilter === "yes") {
-    where.clickCount = { gt: 0 };
-  } else if (clickFilter === "no") {
-    where.clickCount = 0;
-  }
-  if (openedFilter === "yes") {
-    where.openCount = { gt: 0 };
-  } else if (openedFilter === "no") {
-    where.openCount = 0;
-  }
+  const sentAtFilter = makeSentAtFilter();
+  if (sentAtFilter) where.sentAt = sentAtFilter;
+  if (clickFilter  === "yes") where.clickCount = { gt: 0 };
+  else if (clickFilter === "no") where.clickCount = 0;
+  if (openedFilter === "yes") where.openCount = { gt: 0 };
+  else if (openedFilter === "no") where.openCount = 0;
 
+  // ── Paginated logs ──────────────────────────────────────────────────────────
   const [logs, total] = await Promise.all([
     prisma.emailLog.findMany({
       where,
@@ -97,24 +113,71 @@ export default async function EmailHistoryPage({
     }),
     prisma.emailLog.count({ where }),
   ]);
-
   const totalPages = Math.ceil(total / perPage);
 
-  // Total click + open stats
-  const [totalClicks, clickedCount, openedCount] = await Promise.all([
-    prisma.emailLog.aggregate({ _sum: { clickCount: true } }),
-    prisma.emailLog.count({ where: { clickCount: { gt: 0 } } }),
-    prisma.emailLog.count({ where: { openCount: { gt: 0 } } }),
-  ]);
+  // ── Stats — based only on date range (not text / click / opened filters) ───
+  const statsWhere: Prisma.EmailLogWhereInput = sentAtFilter
+    ? { sentAt: sentAtFilter }
+    : {};
 
+  const [statsSent, statsOpenedCount, statsClickedCount, emailedLogs] =
+    await Promise.all([
+      prisma.emailLog.count({ where: statsWhere }),
+      prisma.emailLog.count({ where: { ...statsWhere, openCount:  { gt: 0 } } }),
+      prisma.emailLog.count({ where: { ...statsWhere, clickCount: { gt: 0 } } }),
+      prisma.emailLog.findMany({
+        where: statsWhere,
+        select: { companyId: true, sentAt: true },
+      }),
+    ]);
+
+  // Build map: companyId → first email date in range
+  const companyFirstEmail = new Map<string, Date>();
+  for (const log of emailedLogs) {
+    const existing = companyFirstEmail.get(log.companyId);
+    if (!existing || log.sentAt < existing) {
+      companyFirstEmail.set(log.companyId, log.sentAt);
+    }
+  }
+
+  const companyIds = [...companyFirstEmail.keys()];
+  const paidOrders = companyIds.length > 0
+    ? await prisma.order.findMany({
+        where: {
+          companyId: { in: companyIds },
+          status: "completed",
+        },
+        select: { companyId: true, amount: true, createdAt: true },
+      })
+    : [];
+
+  // Only count orders placed after the first email to that company
+  const attributed = paidOrders.filter((o) => {
+    const first = companyFirstEmail.get(o.companyId);
+    return first && o.createdAt >= first;
+  });
+
+  const conversions  = attributed.length;
+  const revenueCents = attributed.reduce((s, o) => s + o.amount, 0);
+  const revenueStr   = `$${(revenueCents / 100).toFixed(2)}`;
+  const rpeStr       = statsSent > 0
+    ? `$${(revenueCents / 100 / statsSent).toFixed(2)}`
+    : "$0.00";
+
+  const statsLabel = dateFrom || dateTo
+    ? `${dateFrom || "start"} → ${dateTo || "today"}`
+    : "All time";
+
+  // ── URL builder ─────────────────────────────────────────────────────────────
   function buildUrl(overrides: Record<string, string | number>) {
     const base: Record<string, string> = {
       sort: sortBy, dir: sortDir, page: String(page),
     };
-    if (query)        base.q      = query;
-    if (dateFilter)   base.date   = dateFilter;
-    if (clickFilter)  base.clicks = clickFilter;
-    if (openedFilter) base.opened = openedFilter;
+    if (query)        base.q        = query;
+    if (dateFrom)     base.dateFrom = dateFrom;
+    if (dateTo)       base.dateTo   = dateTo;
+    if (clickFilter)  base.clicks   = clickFilter;
+    if (openedFilter) base.opened   = openedFilter;
     const merged = { ...base, ...overrides };
     return (
       "/admin/emails/history?" +
@@ -125,17 +188,13 @@ export default async function EmailHistoryPage({
     );
   }
 
-  function SortHeader({
-    col, label,
-  }: {
-    col: SortCol; label: string;
-  }) {
+  function SortHeader({ col, label }: { col: SortCol; label: string }) {
     const isActive = sortBy === col;
     const nextDir  = isActive && sortDir === "desc" ? "asc" : "desc";
-    const href     = buildUrl({ sort: col, dir: nextDir, page: 1 });
     return (
       <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase whitespace-nowrap">
-        <Link href={href} className="flex items-center gap-1 hover:text-gray-800">
+        <Link href={buildUrl({ sort: col, dir: nextDir, page: 1 })}
+          className="flex items-center gap-1 hover:text-gray-800">
           {label}
           {isActive ? (sortDir === "desc" ? " ↓" : " ↑") : " ↕"}
         </Link>
@@ -143,37 +202,49 @@ export default async function EmailHistoryPage({
     );
   }
 
-  const hasFilters = query || dateFilter || clickFilter || openedFilter;
+  const hasFilters = query || dateFrom || dateTo || clickFilter || openedFilter;
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-8">
-      {/* Header */}
+
+      {/* ── Page header ── */}
       <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-2xl font-bold">
-            Email Offer History ({total.toLocaleString()})
-          </h1>
-          <p className="text-sm text-gray-500 mt-1">
-            Opened: <strong>{openedCount}</strong>
-            {" · "}Total clicks: <strong>{totalClicks._sum.clickCount ?? 0}</strong>
-            {" · "}Emails with ≥1 click: <strong>{clickedCount}</strong>
-          </p>
-        </div>
-        <Link
-          href="/admin/emails"
-          className="text-sm text-blue-600 hover:underline"
-        >
+        <h1 className="text-2xl font-bold">
+          Email Offer History ({total.toLocaleString()})
+        </h1>
+        <Link href="/admin/emails" className="text-sm text-blue-600 hover:underline">
           ← Back to Send Emails
         </Link>
       </div>
 
-      {/* Filters */}
+      {/* ── Stats card ── */}
+      <div className="mb-5 rounded-xl border border-gray-200 bg-white overflow-hidden">
+        <div className="px-4 py-2 bg-gray-50 border-b border-gray-200 flex items-center justify-between">
+          <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+            Statistics
+          </span>
+          <span className="text-xs text-gray-400">{statsLabel}</span>
+        </div>
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 divide-x divide-y sm:divide-y-0 divide-gray-100">
+          {[
+            { label: "Emails Sent",        value: statsSent.toLocaleString() },
+            { label: "Open Rate",          value: `${pct(statsOpenedCount,  statsSent)}%` },
+            { label: "Click Rate",         value: `${pct(statsClickedCount, statsSent)}%` },
+            { label: "Conversion Rate",    value: `${pct(conversions,       statsSent)}%` },
+            { label: "Revenue",            value: revenueStr },
+            { label: "Revenue per Email",  value: rpeStr },
+          ].map(({ label, value }) => (
+            <div key={label} className="px-4 py-3 text-center">
+              <p className="text-xl font-bold text-gray-800">{value}</p>
+              <p className="text-xs text-gray-500 mt-0.5">{label}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* ── Filters ── */}
       <Card className="mb-4">
-        <form
-          action="/admin/emails/history"
-          method="GET"
-          className="flex gap-3 flex-wrap"
-        >
+        <form action="/admin/emails/history" method="GET" className="flex gap-3 flex-wrap">
           <input
             type="text"
             name="q"
@@ -181,12 +252,24 @@ export default async function EmailHistoryPage({
             placeholder="Search by email, company, USDOT, or subject"
             className="flex-1 min-w-[200px] rounded-lg border border-gray-300 px-3 py-2 text-sm"
           />
-          <input
-            type="date"
-            name="date"
-            defaultValue={dateFilter}
-            className="rounded-lg border border-gray-300 px-3 py-2 text-sm"
-          />
+          <div className="flex items-center gap-1">
+            <label className="text-xs text-gray-500 whitespace-nowrap">From</label>
+            <input
+              type="date"
+              name="dateFrom"
+              defaultValue={dateFrom}
+              className="rounded-lg border border-gray-300 px-3 py-2 text-sm"
+            />
+          </div>
+          <div className="flex items-center gap-1">
+            <label className="text-xs text-gray-500 whitespace-nowrap">To</label>
+            <input
+              type="date"
+              name="dateTo"
+              defaultValue={dateTo}
+              className="rounded-lg border border-gray-300 px-3 py-2 text-sm"
+            />
+          </div>
           <select
             name="clicks"
             defaultValue={clickFilter}
@@ -232,10 +315,14 @@ export default async function EmailHistoryPage({
                 <a href={buildUrl({ q: "", page: 1 })} className="ml-1 hover:text-blue-600">✕</a>
               </span>
             )}
-            {dateFilter && (
+            {(dateFrom || dateTo) && (
               <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-purple-100 text-purple-800 text-xs rounded-full">
-                Date: <strong>{dateFilter}</strong>
-                <a href={buildUrl({ date: "", page: 1 })} className="ml-1 hover:text-purple-600">✕</a>
+                {dateFrom && dateTo
+                  ? `${dateFrom} → ${dateTo}`
+                  : dateFrom
+                  ? `From ${dateFrom}`
+                  : `To ${dateTo}`}
+                <a href={buildUrl({ dateFrom: "", dateTo: "", page: 1 })} className="ml-1 hover:text-purple-600">✕</a>
               </span>
             )}
             {clickFilter === "yes" && (
@@ -266,25 +353,26 @@ export default async function EmailHistoryPage({
         )}
       </Card>
 
-      {/* Table */}
+      {/* ── Table ── */}
       <div className="overflow-x-auto rounded-lg border border-gray-200 bg-white">
         <table className="w-full text-sm">
           <thead className="bg-gray-50 border-b border-gray-200">
             <tr>
-              <SortHeader col="sentAt"       label="Sent At" />
-              <SortHeader col="companyName"  label="Company" />
-              <SortHeader col="usdotNumber"  label="US DOT #" />
-              <SortHeader col="toEmail"      label="Email" />
+              <SortHeader col="sentAt"      label="Sent At" />
+              <SortHeader col="companyName" label="Company" />
+              <SortHeader col="usdotNumber" label="US DOT #" />
+              <SortHeader col="toEmail"     label="Email" />
               <SortHeader col="subject"     label="Subject" />
               <SortHeader col="openCount"   label="Opened" />
               <SortHeader col="clickCount"  label="Clicks" />
               <SortHeader col="lastClickAt" label="Last Click" />
+              <th className="px-3 py-2" />
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
             {logs.length === 0 && (
               <tr>
-                <td colSpan={8} className="px-3 py-8 text-center text-gray-400">
+                <td colSpan={9} className="px-3 py-8 text-center text-gray-400">
                   No email logs found.
                 </td>
               </tr>
@@ -295,30 +383,28 @@ export default async function EmailHistoryPage({
               const firstOpen = log.firstOpenAt ? new Date(log.firstOpenAt) : null;
               return (
                 <tr key={log.id} className="hover:bg-gray-50 transition">
-                  <td className="px-3 py-2 whitespace-nowrap text-gray-600">
+                  <td className="px-3 py-2 whitespace-nowrap text-gray-600 text-xs">
                     {sentDate.toLocaleDateString("en-US")}{" "}
-                    <span className="text-gray-400 text-xs">
+                    <span className="text-gray-400">
                       {sentDate.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}
                     </span>
                   </td>
-                  <td className="px-3 py-2 font-medium text-gray-900 max-w-[160px] truncate">
+                  <td className="px-3 py-2 font-medium text-gray-900 max-w-[150px] truncate">
                     {log.company.companyName}
                   </td>
                   <td className="px-3 py-2 font-mono text-xs text-gray-600 whitespace-nowrap">
                     {log.company.usdotNumber}
                   </td>
-                  <td className="px-3 py-2 text-gray-600 max-w-[180px] truncate">
+                  <td className="px-3 py-2 text-gray-600 max-w-[160px] truncate text-xs">
                     {log.toEmail}
                   </td>
-                  <td className="px-3 py-2 text-gray-600 max-w-[200px] truncate" title={log.subject}>
+                  <td className="px-3 py-2 text-gray-600 max-w-[180px] truncate text-xs" title={log.subject}>
                     {log.subject}
                   </td>
                   <td className="px-3 py-2 whitespace-nowrap">
                     {firstOpen ? (
                       <span className="inline-flex flex-col items-start gap-0.5">
-                        <span className="inline-flex items-center gap-1 text-teal-700 font-semibold text-xs">
-                          ✓ Opened
-                        </span>
+                        <span className="text-teal-700 font-semibold text-xs">✓ Opened</span>
                         <span className="text-gray-400 text-xs">
                           {firstOpen.toLocaleDateString("en-US")}{" "}
                           {firstOpen.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}
@@ -329,13 +415,9 @@ export default async function EmailHistoryPage({
                     )}
                   </td>
                   <td className="px-3 py-2">
-                    <span
-                      className={`inline-flex items-center justify-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${
-                        log.clickCount > 0
-                          ? "bg-green-100 text-green-800"
-                          : "bg-gray-100 text-gray-500"
-                      }`}
-                    >
+                    <span className={`inline-flex items-center justify-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${
+                      log.clickCount > 0 ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-500"
+                    }`}>
                       {log.clickCount}
                     </span>
                   </td>
@@ -344,6 +426,9 @@ export default async function EmailHistoryPage({
                       ? `${lastClick.toLocaleDateString("en-US")} ${lastClick.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}`
                       : "—"}
                   </td>
+                  <td className="px-3 py-2 text-right">
+                    <DeleteEmailLogButton id={log.id} />
+                  </td>
                 </tr>
               );
             })}
@@ -351,7 +436,7 @@ export default async function EmailHistoryPage({
         </table>
       </div>
 
-      {/* Pagination */}
+      {/* ── Pagination ── */}
       {totalPages > 1 && (
         <div className="flex justify-center gap-2 mt-6 flex-wrap">
           {page > 1 && (
@@ -362,13 +447,8 @@ export default async function EmailHistoryPage({
           {Array.from({ length: Math.min(totalPages, 10) }, (_, i) => {
             const p = i + 1;
             return (
-              <a
-                key={p}
-                href={buildUrl({ page: p })}
-                className={`px-3 py-1 rounded text-sm ${
-                  p === page ? "bg-blue-600 text-white" : "bg-gray-200 hover:bg-gray-300"
-                }`}
-              >
+              <a key={p} href={buildUrl({ page: p })}
+                className={`px-3 py-1 rounded text-sm ${p === page ? "bg-blue-600 text-white" : "bg-gray-200 hover:bg-gray-300"}`}>
                 {p}
               </a>
             );
