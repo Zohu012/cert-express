@@ -41,8 +41,7 @@ export default async function PayPage({
                 Get a Copy of Your FMCSA Document
               </h1>
               <p className="text-gray-500 text-sm">
-                Publicly available document — instant digital delivery after
-                payment
+                Instant PDF delivery — secure access immediately after payment
               </p>
             </div>
 
