@@ -141,15 +141,15 @@ export default async function HomePage({
                     </div>
                   </div>
                   {company.previewFilename && (
-                    <div className="flex-shrink-0 hidden sm:block">
+                    <Link href={`/pay/${company.id}`} className="flex-shrink-0 hidden sm:block">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img
                         src={`/previews/${company.previewFilename}`}
                         alt="Document preview"
                         width={112}
-                        className="w-28 rounded border border-gray-200 shadow-sm"
+                        className="w-28 rounded border border-gray-200 shadow-sm hover:opacity-80 transition"
                       />
-                    </div>
+                    </Link>
                   )}
                   <Link
                     href={`/pay/${company.id}`}
