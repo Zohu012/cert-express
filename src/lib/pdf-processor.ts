@@ -2,6 +2,7 @@ import { spawn } from "child_process";
 import { createInterface } from "readline";
 import path from "path";
 import { prisma } from "./db";
+import { generateDocuments } from "./document-generator";
 import type { ParsedCompany } from "@/types";
 
 const PYTHON_PATH = process.env.PYTHON_PATH || "python";
@@ -81,6 +82,22 @@ export async function processPdf(sourcePdfId: string, filePath: string) {
     });
 
     console.log(`[PDF Processor] Done. ${companyCount} companies saved.`);
+
+    // Fire-and-forget: generate clean PDFs + preview images in background
+    prisma.company
+      .findMany({ where: { sourcePdfId, previewFilename: null } })
+      .then((companies) => generateDocuments(companies))
+      .then((previewMap) => {
+        if (previewMap.size === 0) return;
+        return prisma.$transaction(
+          [...previewMap.entries()].map(([id, previewFilename]) =>
+            prisma.company.update({ where: { id }, data: { previewFilename } })
+          )
+        );
+      })
+      .then(() => console.log(`[PDF Processor] Previews generated for source ${sourcePdfId}`))
+      .catch((err) => console.error("[Document Generator] Background generation failed:", err));
+
     return companyCount;
   } catch (error) {
     await prisma.sourcePdf.update({

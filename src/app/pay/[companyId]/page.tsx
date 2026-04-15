@@ -105,6 +105,22 @@ export default async function PayPage({
               )}
             </div>
 
+            {/* Preview image */}
+            {company.previewFilename && (
+              <div className="mb-6 text-center">
+                <p className="text-sm text-gray-500 mb-2 font-medium">Document Preview</p>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={`/previews/${company.previewFilename}`}
+                  alt="Document preview"
+                  className="mx-auto rounded-lg border border-gray-200 shadow max-w-xs w-full"
+                />
+                <p className="text-xs text-gray-400 mt-2">
+                  Complete your payment to unlock the full document.
+                </p>
+              </div>
+            )}
+
             {/* Price */}
             <div className="text-center mb-4">
               {initialPriceDisplay && (

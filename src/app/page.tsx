@@ -113,7 +113,7 @@ export default async function HomePage({
             </div>
             {companies.map((company) => (
               <Card key={company.id} className="hover:shadow-md transition">
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
                   <div className="flex-1">
                     <h3 className="font-semibold text-lg">
                       {company.companyName}
@@ -140,9 +140,20 @@ export default async function HomePage({
                       </span>
                     </div>
                   </div>
+                  {company.previewFilename && (
+                    <div className="flex-shrink-0 hidden sm:block">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={`/previews/${company.previewFilename}`}
+                        alt="Document preview"
+                        width={112}
+                        className="w-28 rounded border border-gray-200 shadow-sm"
+                      />
+                    </div>
+                  )}
                   <Link
                     href={`/pay/${company.id}`}
-                    className="inline-flex items-center justify-center rounded-lg bg-green-600 px-5 py-2.5 text-sm font-medium text-white hover:bg-green-700 transition whitespace-nowrap"
+                    className="inline-flex items-center justify-center rounded-lg bg-green-600 px-5 py-2.5 text-sm font-medium text-white hover:bg-green-700 transition whitespace-nowrap self-center"
                   >
                     Get a Copy &mdash; {priceDisplay}
                   </Link>

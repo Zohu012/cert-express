@@ -33,8 +33,9 @@ model Company {
   documentNumber String
   documentType   String
   serviceDate    DateTime
-  pdfFilename    String?
-  email          String?
+  pdfFilename     String?
+  previewFilename String?
+  email           String?
   emailSentAt    DateTime?
   emailStatus    String?
   sourcePdfId    String

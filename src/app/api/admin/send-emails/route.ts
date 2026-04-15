@@ -9,7 +9,7 @@ function templateToHtml(
   text: string,
   paymentLink: string,
   appUrl: string,
-  openPixelUrl?: string
+  openPixelUrl?: string,
 ): string {
   const logoUrl = `${appUrl}/logo.png`;
 
@@ -20,6 +20,23 @@ function templateToHtml(
 
   for (const line of lines) {
     const trimmed = line.trim();
+
+    // Preview image URL line → email-safe centered image block
+    if (/^https?:\/\/.+\.(png|jpg|jpeg)$/i.test(trimmed)) {
+      if (inList) { bodyHtml += "</ul>"; inList = false; }
+      bodyHtml += `
+        <table width="100%" cellpadding="0" cellspacing="0" style="margin:20px 0;">
+          <tr><td align="center">
+            <img src="${trimmed}" width="380"
+                 style="border:1px solid #e5e7eb;border-radius:6px;display:block;
+                        max-width:380px;width:100%;" alt="Document preview" />
+            <p style="margin:8px 0 0;color:#6b7280;font-size:12px;">
+              Preview &mdash; click below to unlock the full document
+            </p>
+          </td></tr>
+        </table>`;
+      continue;
+    }
 
     // Payment link line → green button
     if (trimmed.includes(paymentLink)) {
@@ -120,6 +137,8 @@ Document Details:
 
 Your certificate is now available for immediate access.
 
+{{previewImageUrl}}
+
 You can securely retrieve a processed copy here:
 
 {{paymentLink}}
@@ -181,7 +200,13 @@ export async function POST(req: NextRequest) {
             new Date(company.serviceDate).toLocaleDateString("en-US")
           )
           .replace(/\{\{price\}\}/g, `$${(priceCents / 100).toFixed(2)}`)
-          .replace(/\{\{paymentLink\}\}/g, trackingUrl);
+          .replace(/\{\{paymentLink\}\}/g, trackingUrl)
+          .replace(
+            /\{\{previewImageUrl\}\}/g,
+            company.previewFilename
+              ? `${appUrl}/previews/${company.previewFilename}`
+              : ""
+          );
 
       const subject = interpolate(
         settings.email_subject ||

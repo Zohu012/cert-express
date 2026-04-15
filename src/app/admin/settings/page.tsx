@@ -322,7 +322,9 @@ export default function SettingsPage() {
               Variables: {"{{companyName}}"}, {"{{documentType}}"},{" "}
               {"{{documentNumber}}"}, {"{{usdotNumber}}"}, {"{{serviceDate}}"},{" "}
               {"{{price}}"}, {"{{paymentLink}}"}, {"{{dbaName}}"},{" "}
-              {"{{city}}"}, {"{{state}}"}
+              {"{{city}}"}, {"{{state}}"},{" "}
+              {"{{previewImageUrl}}"}{" "}
+              <span className="text-gray-300">(blurred document preview image)</span>
             </p>
           </div>
 

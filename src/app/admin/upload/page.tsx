@@ -231,6 +231,89 @@ function FetchFromFMCSA() {
   );
 }
 
+// ─── Generate Previews section ──────────────────────────────────────────────
+
+function GeneratePreviews() {
+  const [pending, setPending] = useState<number | null>(null);
+  const [running, setRunning] = useState(false);
+  const [result, setResult] = useState<{ generated: number; total: number } | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetch("/api/admin/generate-documents")
+      .then((r) => r.json())
+      .then((d) => setPending(d.pending ?? null))
+      .catch(() => {});
+  }, []);
+
+  async function handleGenerate() {
+    setRunning(true);
+    setError(null);
+    setResult(null);
+    try {
+      const res = await fetch("/api/admin/generate-documents", { method: "POST" });
+      const data = await res.json();
+      if (data.error) {
+        setError(data.error);
+      } else {
+        setResult({ generated: data.generated, total: data.total ?? data.generated });
+        setPending(0);
+      }
+    } catch {
+      setError("Network error. Please try again.");
+    } finally {
+      setRunning(false);
+    }
+  }
+
+  return (
+    <Card className="mb-6">
+      <div className="flex items-start justify-between mb-3">
+        <div>
+          <h2 className="text-base font-semibold">Generate Document Previews</h2>
+          <p className="text-xs text-gray-500 mt-0.5">
+            Creates a clean formatted PDF and a blurred preview image for each company. Used in emails and on the payment page.
+          </p>
+        </div>
+      </div>
+
+      <div className="flex items-center gap-4">
+        <Button onClick={handleGenerate} disabled={running || pending === 0}>
+          {running ? "Generating..." : "Generate Now"}
+        </Button>
+        {pending !== null && (
+          <span className="text-sm text-gray-500">
+            {pending === 0
+              ? "All previews up to date."
+              : `${pending} compan${pending === 1 ? "y needs" : "ies need"} a preview.`}
+          </span>
+        )}
+      </div>
+
+      {running && (
+        <div className="mt-3 w-full bg-gray-100 rounded-full h-3 overflow-hidden">
+          <div className="h-3 w-full bg-green-500 rounded-full animate-pulse" />
+        </div>
+      )}
+
+      {result && (
+        <div className="mt-3 flex items-center gap-2 p-3 bg-green-50 border border-green-200 rounded-lg">
+          <span className="text-green-600">✓</span>
+          <p className="text-sm text-green-700 font-medium">
+            Generated {result.generated} preview{result.generated !== 1 ? "s" : ""}.
+          </p>
+        </div>
+      )}
+
+      {error && (
+        <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-lg">
+          <p className="text-sm text-red-700">{error}</p>
+        </div>
+      )}
+    </Card>
+  );
+}
+
 // ─── Manual upload section ───────────────────────────────────────────────────
 
 export default function UploadPage() {
@@ -307,6 +390,9 @@ export default function UploadPage() {
 
       {/* Auto-fetch from FMCSA */}
       <FetchFromFMCSA />
+
+      {/* Generate document previews */}
+      <GeneratePreviews />
 
       {/* Manual upload */}
       <Card>
