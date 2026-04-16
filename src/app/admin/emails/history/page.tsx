@@ -115,10 +115,11 @@ export default async function EmailHistoryPage({
   ]);
   const totalPages = Math.ceil(total / perPage);
 
-  // ── Stats — based only on date range (not text / click / opened filters) ───
-  const statsWhere: Prisma.EmailLogWhereInput = sentAtFilter
-    ? { sentAt: sentAtFilter }
-    : {};
+  // ── Stats — reflect ALL active filters (search, date range, click, opened).
+  //    When no filters are applied, stats cover every row in EmailLog.
+  //    Since these are live Prisma queries + force-dynamic rendering, deleting
+  //    a row updates the stats on the next page load automatically.
+  const statsWhere: Prisma.EmailLogWhereInput = where;
 
   const [statsSent, statsOpenedCount, statsClickedCount, emailedLogs] =
     await Promise.all([
@@ -164,8 +165,17 @@ export default async function EmailHistoryPage({
     ? `$${(revenueCents / 100 / statsSent).toFixed(2)}`
     : "$0.00";
 
-  const statsLabel = dateFrom || dateTo
-    ? `${dateFrom || "start"} → ${dateTo || "today"}`
+  const statsLabelParts: string[] = [];
+  if (dateFrom || dateTo) {
+    statsLabelParts.push(`${dateFrom || "start"} → ${dateTo || "today"}`);
+  }
+  if (query) statsLabelParts.push(`"${query}"`);
+  if (clickFilter  === "yes") statsLabelParts.push("has clicks");
+  if (clickFilter  === "no")  statsLabelParts.push("no clicks");
+  if (openedFilter === "yes") statsLabelParts.push("opened");
+  if (openedFilter === "no")  statsLabelParts.push("not opened");
+  const statsLabel = statsLabelParts.length > 0
+    ? statsLabelParts.join(" · ")
     : "All time";
 
   // ── URL builder ─────────────────────────────────────────────────────────────
