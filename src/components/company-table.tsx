@@ -128,6 +128,7 @@ export function CompanyTable({
   dateFilter = "",
   emailFilter = "",
   page = 1,
+  scrapedEmailMap = {},
 }: {
   companies: Company[];
   sortBy?: string;
@@ -136,6 +137,7 @@ export function CompanyTable({
   dateFilter?: string;
   emailFilter?: string;
   page?: number;
+  scrapedEmailMap?: Record<string, string>;
 }) {
   const sort: SortProps = { sortBy, sortDir, query, dateFilter, emailFilter, page };
   const router = useRouter();
@@ -237,6 +239,7 @@ export function CompanyTable({
               <SortHeader col="serviceDate"    label="Date"     sort={sort} />
               <SortHeader col="city"           label="Location" sort={sort} />
               <SortHeader col="email"          label="Email"    sort={sort} />
+              <th className="px-4 py-3 text-gray-600">Scraped Email</th>
               <th className="px-4 py-3 text-gray-600">PDF</th>
               <SortHeader col="createdAt"      label="Added"    sort={sort} />
               <th className="px-4 py-3 text-gray-600">Actions</th>
@@ -247,6 +250,7 @@ export function CompanyTable({
               <CompanyRow
                 key={c.id}
                 company={c}
+                scrapedEmail={scrapedEmailMap[c.usdotNumber] || null}
                 onEdit={openEdit}
                 onDelete={(id) => { setDeleteId(id); setDeleteError(""); }}
                 onUpdated={(updated) =>
@@ -482,11 +486,13 @@ export function CompanyTable({
 // ─── CompanyRow ──────────────────────────────────────────────────────────────
 function CompanyRow({
   company,
+  scrapedEmail,
   onEdit,
   onDelete,
   onUpdated,
 }: {
   company: Company;
+  scrapedEmail: string | null;
   onEdit: (c: Company) => void;
   onDelete: (id: string) => void;
   onUpdated: (c: Company) => void;
@@ -637,6 +643,15 @@ function CompanyRow({
           >
             {emailStatus}
           </span>
+        )}
+      </td>
+
+      {/* Scraped Email */}
+      <td className="px-4 py-2">
+        {scrapedEmail ? (
+          <span className="text-xs text-purple-700 italic">{scrapedEmail}</span>
+        ) : (
+          <span className="text-gray-300 text-xs">-</span>
         )}
       </td>
 

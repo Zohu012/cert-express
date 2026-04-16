@@ -6,6 +6,7 @@ import { verifySession } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { Card } from "@/components/ui/card";
 import { CompanyTable } from "@/components/company-table";
+import { MigrateEmailsButton } from "@/components/migrate-emails-button";
 import type { Prisma } from "@prisma/client";
 
 const SORTABLE_COLS = [
@@ -86,6 +87,19 @@ export default async function CompaniesPage({
     prisma.company.count({ where }),
   ]);
 
+  // Fetch scraped emails for these companies from OtruckingCompany
+  const dotNumbers = [...new Set(companies.map((c) => c.usdotNumber))];
+  const otruckingEmails = dotNumbers.length > 0
+    ? await prisma.otruckingCompany.findMany({
+        where: { usdotNumber: { in: dotNumbers }, email: { not: null } },
+        select: { usdotNumber: true, email: true },
+      })
+    : [];
+  const scrapedEmailMap: Record<string, string> = {};
+  for (const oe of otruckingEmails) {
+    if (oe.email) scrapedEmailMap[oe.usdotNumber] = oe.email;
+  }
+
   const totalPages = Math.ceil(total / perPage);
 
   // Build URL preserving all active params
@@ -114,6 +128,7 @@ export default async function CompaniesPage({
     <div className="max-w-7xl mx-auto px-4 py-8">
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold">Companies ({total.toLocaleString()})</h1>
+        <MigrateEmailsButton />
       </div>
 
       <Card className="mb-4">
@@ -199,6 +214,7 @@ export default async function CompaniesPage({
         dateFilter={dateFilter}
         emailFilter={emailFilter}
         page={page}
+        scrapedEmailMap={scrapedEmailMap}
       />
 
       {totalPages > 1 && (
