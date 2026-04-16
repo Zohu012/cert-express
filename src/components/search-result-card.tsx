@@ -27,7 +27,7 @@ export function SearchResultCard({
 }) {
   const [modalOpen, setModalOpen] = useState(false);
   const previewUrl = company.previewFilename
-    ? `/previews/${company.previewFilename}`
+    ? `/api/previews/${company.previewFilename}`
     : null;
 
   return (

@@ -38,7 +38,7 @@ export default async function PayPage({
   })();
 
   const previewUrl = company.previewFilename
-    ? `/previews/${company.previewFilename}`
+    ? `/api/previews/${company.previewFilename}`
     : null;
 
   return (
