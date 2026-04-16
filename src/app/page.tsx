@@ -52,7 +52,7 @@ export default async function HomePage({
             FMCSA Certificate of Authority Lookup
           </h1>
           <p className="text-blue-200 mb-8">
-            Search by USDOT Number, MC/MX Number, or Company Name
+            Search by USDOT Number, MC/MX Number or Company Name
           </p>
 
           <Card className="text-left !bg-blue-50 !border-blue-200">
