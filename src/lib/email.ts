@@ -76,20 +76,33 @@ export async function sendOrderConfirmationEmail({
   const subject = `Your FMCSA ${documentType} is Ready – Download Now`;
 
   const text = [
-    `Thank you for your purchase!`,
+    `Hello,`,
     ``,
-    `Your FMCSA ${documentType} for ${companyName} is ready to download.`,
+    `Thank you for your purchase. Your ${documentType} PDF copy for ${companyName} is ready for download.`,
     ``,
-    `Document:    ${documentNumber}`,
+    `Document Details:`,
+    `Company: ${companyName}`,
+    `Document Type: ${documentType}`,
+    `Document #: ${documentNumber}`,
     `Service Date: ${formattedDate}`,
     `Amount Paid: ${price}`,
     ``,
-    `Download your certificate here:`,
+    `Download your document:`,
     downloadUrl,
     ``,
-    `This link allows up to ${maxDownloads} downloads and expires on ${expiryStr}.`,
+    `Download link details:`,
+    `This link allows up to ${maxDownloads} downloads and expires on ${expiryStr}. Please save your document before it expires.`,
     ``,
-    `Thank you for using CertExpress.`,
+    `If the button doesn't work, copy and paste this link into your browser:`,
+    downloadUrl,
+    ``,
+    `This is an independent document delivery service providing a convenient PDF copy of your FMCSA record.`,
+    `We are not affiliated with the Federal Motor Carrier Safety Administration (FMCSA) or the U.S. Department of Transportation.`,
+    ``,
+    `If you have any questions, simply reply to this email or visit certexpresss.com and we'll help.`,
+    ``,
+    `Best regards,`,
+    `CertExpress Team`,
   ].join("\n");
 
   const html = `
@@ -112,7 +125,7 @@ export async function sendOrderConfirmationEmail({
         <!-- Success banner -->
         <tr>
           <td style="background:#dcfce7;padding:16px 40px;text-align:center;border-bottom:1px solid #bbf7d0;">
-            <p style="margin:0;color:#15803d;font-size:15px;font-weight:bold;">✅ Payment Confirmed – Your Certificate is Ready!</p>
+            <p style="margin:0;color:#15803d;font-size:15px;font-weight:bold;">✅ Payment Confirmed – Your Document is Ready!</p>
           </td>
         </tr>
 
@@ -121,7 +134,7 @@ export async function sendOrderConfirmationEmail({
           <td style="padding:36px 40px;">
             <p style="margin:0 0 8px;color:#374151;font-size:15px;">Hello,</p>
             <p style="margin:0 0 24px;color:#374151;font-size:15px;">
-              Thank you for your purchase. Your official FMCSA <strong>${documentType}</strong> for
+              Thank you for your purchase. Your <strong>${documentType}</strong> PDF copy for
               <strong>${companyName}</strong> is ready for download.
             </p>
 
@@ -160,7 +173,7 @@ export async function sendOrderConfirmationEmail({
                    style="display:inline-block;background:#16a34a;color:#ffffff;text-decoration:none;
                           padding:16px 48px;border-radius:8px;font-size:16px;font-weight:bold;
                           letter-spacing:0.2px;">
-                  ⬇ Download Your Certificate
+                  ⬇ Download Your Document
                 </a>
               </td></tr>
             </table>
@@ -171,15 +184,31 @@ export async function sendOrderConfirmationEmail({
                 <p style="margin:0;color:#92400e;font-size:13px;line-height:1.5;">
                   <strong>⚠ Download link details:</strong><br>
                   This link allows up to <strong>${maxDownloads} downloads</strong> and expires on
-                  <strong>${expiryStr}</strong>. Please save your certificate before it expires.
+                  <strong>${expiryStr}</strong>. Please save your document before it expires.
                 </p>
               </td></tr>
             </table>
 
             <!-- Backup link -->
             <p style="margin:20px 0 0;color:#6b7280;font-size:12px;word-break:break-all;">
-              If the button doesn't work, copy this link:<br>
+              If the button doesn't work, copy and paste this link into your browser:<br>
               <a href="${downloadUrl}" style="color:#2563eb;">${downloadUrl}</a>
+            </p>
+
+            <!-- Disclaimer -->
+            <p style="margin:24px 0 0;color:#6b7280;font-size:12px;line-height:1.5;">
+              This is an independent document delivery service providing a convenient PDF copy of your FMCSA record.
+              We are not affiliated with the Federal Motor Carrier Safety Administration (FMCSA) or the U.S. Department of Transportation.
+            </p>
+
+            <p style="margin:16px 0 0;color:#6b7280;font-size:12px;">
+              If you have any questions, simply reply to this email or visit
+              <a href="${appUrl}" style="color:#2563eb;">certexpresss.com</a> and we'll help.
+            </p>
+
+            <p style="margin:16px 0 0;color:#374151;font-size:13px;">
+              Best regards,<br>
+              <strong>CertExpress Team</strong>
             </p>
           </td>
         </tr>
@@ -188,8 +217,7 @@ export async function sendOrderConfirmationEmail({
         <tr>
           <td style="background:#f9fafb;border-top:1px solid #e5e7eb;padding:20px 40px;text-align:center;">
             <p style="margin:0;color:#9ca3af;font-size:12px;">
-              CertExpress &mdash; FMCSA Certificate Delivery<br>
-              Questions? Reply to this email or visit
+              CertExpress &mdash; FMCSA Document Delivery Service<br>
               <a href="${appUrl}" style="color:#2563eb;">certexpresss.com</a>
             </p>
           </td>
