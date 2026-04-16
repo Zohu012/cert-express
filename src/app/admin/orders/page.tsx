@@ -47,6 +47,8 @@ export default async function OrdersPage({
             companyName: true,
             usdotNumber: true,
             documentNumber: true,
+            serviceDate: true,
+            pdfFilename: true,
           },
         },
       },

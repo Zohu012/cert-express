@@ -20,6 +20,8 @@ interface OrderRow {
     companyName: string;
     usdotNumber: string;
     documentNumber: string;
+    serviceDate: Date;
+    pdfFilename: string | null;
   };
 }
 
@@ -144,6 +146,8 @@ export function OrderTable({ orders }: { orders: OrderRow[] }) {
               <th className="px-4 py-3">Date</th>
               <th className="px-4 py-3">Company</th>
               <th className="px-4 py-3">DOT #</th>
+              <th className="px-4 py-3">Doc Date</th>
+              <th className="px-4 py-3">PDF</th>
               <th className="px-4 py-3">Buyer Email</th>
               <th className="px-4 py-3">Method</th>
               <th className="px-4 py-3">Amount</th>
@@ -156,7 +160,7 @@ export function OrderTable({ orders }: { orders: OrderRow[] }) {
           <tbody>
             {rows.length === 0 && (
               <tr>
-                <td colSpan={10} className="text-center py-10 text-gray-400">
+                <td colSpan={12} className="text-center py-10 text-gray-400">
                   No orders found
                 </td>
               </tr>
@@ -172,6 +176,23 @@ export function OrderTable({ orders }: { orders: OrderRow[] }) {
                   </span>
                 </td>
                 <td className="px-4 py-2 text-gray-600">{order.company.usdotNumber}</td>
+                <td className="px-4 py-2 text-gray-600 whitespace-nowrap">
+                  {fmtDate(order.company.serviceDate)}
+                </td>
+                <td className="px-4 py-2">
+                  {order.company.pdfFilename ? (
+                    <a
+                      href={`/api/admin/pdf/${order.company.id}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="rounded-md bg-blue-50 px-3 py-1 text-xs font-medium text-blue-700 hover:bg-blue-100 border border-blue-200"
+                    >
+                      View
+                    </a>
+                  ) : (
+                    <span className="text-gray-400 text-xs">No PDF</span>
+                  )}
+                </td>
                 <td className="px-4 py-2">
                   {order.customerEmail ? (
                     <a
