@@ -5,19 +5,12 @@ import { redirect } from "next/navigation";
 import { Card } from "@/components/ui/card";
 import { OtruckingCompanyTable } from "@/components/otrucking-company-table";
 import { ScrapeTriggerButton } from "@/components/scrape-trigger-button";
+import { prisma } from "@/lib/db";
+import type { Prisma } from "@prisma/client";
 
 async function fetchData(page: number, query: string, statusFilter: string) {
-  // Server-side fetch to our own API — use absolute URL via headers
-  const params = new URLSearchParams({ page: String(page) });
-  if (query) params.set("q", query);
-  if (statusFilter) params.set("status", statusFilter);
-
-  // Import prisma directly for server component
-  const { prisma } = await import("@/lib/db");
-  const { Prisma } = await import("@prisma/client");
-
   const perPage = 50;
-  const where: Record<string, unknown> = {};
+  const where: Prisma.OtruckingCompanyWhereInput = {};
 
   if (query) {
     where.OR = [
@@ -32,12 +25,12 @@ async function fetchData(page: number, query: string, statusFilter: string) {
 
   const [companies, total] = await Promise.all([
     prisma.otruckingCompany.findMany({
-      where: where as Prisma.OtruckingCompanyWhereInput,
+      where,
       orderBy: { scrapedAt: "desc" },
       skip: (page - 1) * perPage,
       take: perPage,
     }),
-    prisma.otruckingCompany.count({ where: where as Prisma.OtruckingCompanyWhereInput }),
+    prisma.otruckingCompany.count({ where }),
   ]);
 
   return { companies, total, totalPages: Math.ceil(total / perPage) };

@@ -11,35 +11,43 @@ export async function GET(req: NextRequest) {
   const page = Math.max(1, parseInt(req.nextUrl.searchParams.get("page") || "1"));
   const perPage = 50;
 
-  const [companies, total] = await Promise.all([
-    prisma.company.findMany({
-      where: {
-        email: { not: null },
-        emailStatus: null,
-      },
-      select: {
-        id: true,
-        companyName: true,
-        documentNumber: true,
-        documentType: true,
-        email: true,
-        emailStatus: true,
-        serviceDate: true,
-      },
-      orderBy: { createdAt: "desc" },
-      skip: (page - 1) * perPage,
-      take: perPage,
-    }),
-    prisma.company.count({
-      where: {
-        email: { not: null },
-        emailStatus: null,
-      },
-    }),
-  ]);
+  // Get all companies with emails
+  const companiesWithEmail = await prisma.company.findMany({
+    where: { email: { not: null } },
+    select: {
+      id: true,
+      companyName: true,
+      documentNumber: true,
+      documentType: true,
+      email: true,
+      emailStatus: true,
+      serviceDate: true,
+      usdotNumber: true,
+    },
+    orderBy: { createdAt: "desc" },
+  });
+
+  // Get all contacted (company, email) combinations from EmailLog
+  const contacted = await prisma.emailLog.findMany({
+    select: { companyId: true, toEmail: true },
+    distinct: ["companyId", "toEmail"],
+  });
+
+  const contactedSet = new Set(
+    contacted.map((c) => `${c.companyId}:${c.toEmail.toLowerCase()}`)
+  );
+
+  // Filter to only companies NOT in the contacted set
+  const candidates = companiesWithEmail.filter((c) => {
+    const key = `${c.id}:${c.email?.toLowerCase()}`;
+    return !contactedSet.has(key);
+  });
+
+  const total = candidates.length;
+  const paged = candidates.slice((page - 1) * perPage, page * perPage);
 
   return NextResponse.json({
-    companies,
+    companies: paged,
     total,
     page,
     perPage,
