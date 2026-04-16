@@ -3,13 +3,23 @@ import Script from "next/script";
 import "./globals.css";
 
 export const metadata: Metadata = {
+  metadataBase: new URL("https://www.certexpresss.com"),
   title: "CertExpress - FMCSA Certificate Delivery",
   description:
     "Get your FMCSA Certificate of Authority delivered instantly. Search by USDOT Number, MC/MX Number, or Company Name.",
   icons: {
-    icon: "/logo_icon.png",
-    shortcut: "/logo_icon.png",
-    apple: "/logo_icon.png",
+    icon: [
+      { url: "/logo_icon.png", type: "image/png", sizes: "any" },
+    ],
+    shortcut: [{ url: "/logo_icon.png", type: "image/png" }],
+    apple: [{ url: "/logo_icon.png", type: "image/png", sizes: "180x180" }],
+  },
+  openGraph: {
+    title: "CertExpress - FMCSA Certificate Delivery",
+    description:
+      "Get your FMCSA Certificate of Authority delivered instantly.",
+    images: ["/logo_icon.png"],
+    type: "website",
   },
 };
 
