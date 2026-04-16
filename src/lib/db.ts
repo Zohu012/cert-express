@@ -26,7 +26,7 @@ if (!globalForPrisma.prismaInit) {
       console.error("[prisma] PRAGMA synchronous failed:", e);
     }
     try {
-      await prisma.$executeRawUnsafe("PRAGMA busy_timeout = 30000");
+      await prisma.$queryRawUnsafe("PRAGMA busy_timeout = 30000");
     } catch (e) {
       console.error("[prisma] PRAGMA busy_timeout failed:", e);
     }
