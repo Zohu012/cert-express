@@ -1,13 +1,19 @@
 import Link from "next/link";
 import { verifySession } from "@/lib/auth";
-import { redirect } from "next/navigation";
 
 export default async function AdminLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  // Allow login page to render without auth
+  // Only show the admin navbar when the viewer is authenticated.
+  // Login page (and any other unauthenticated admin routes) render without it.
+  const adminId = await verifySession();
+
+  if (!adminId) {
+    return <div className="min-h-screen bg-gray-50">{children}</div>;
+  }
+
   return (
     <div className="min-h-screen flex flex-col">
       <header className="bg-gray-900 text-white">
