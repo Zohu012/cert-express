@@ -180,15 +180,18 @@ def generate_clean_pdf(company: dict, pdf_path: str) -> bool:
     return True
 
 
-def generate_preview(pdf_path: str, preview_path: str) -> bool:
+def generate_preview(pdf_path: str, preview_path: str, original_pdf_path: str | None = None) -> bool:
     """Render first page of PDF, blur lower 60%, add watermark. Returns True if generated."""
     if os.path.exists(preview_path):
         return False  # already exists, skip
 
-    # Render at 150 DPI
-    pdf_doc = fitz.open(pdf_path)
+    # Prefer the original FMCSA PDF for a more authentic preview
+    source_pdf = original_pdf_path if original_pdf_path and os.path.exists(original_pdf_path) else pdf_path
+
+    # Render at 200 DPI for ~1200px width
+    pdf_doc = fitz.open(source_pdf)
     page = pdf_doc[0]
-    mat = fitz.Matrix(150 / 72, 150 / 72)  # 150 DPI (default PDF unit = 72pt)
+    mat = fitz.Matrix(200 / 72, 200 / 72)  # 200 DPI
     pix = page.get_pixmap(matrix=mat, alpha=False)
     pdf_doc.close()
 
@@ -273,14 +276,17 @@ def main():
     for company in companies:
         company_id  = company.get("id", "")
         doc_number  = company.get("documentNumber", "")
+        pdf_filename = company.get("pdfFilename", "")
         safe_name   = safe_filename(doc_number)
 
         pdf_path     = os.path.join(pdf_dir, f"{safe_name}.pdf")
         preview_path = os.path.join(preview_dir, f"{safe_name}.png")
+        # Original FMCSA PDF (UUID.pdf) — more authentic for preview
+        original_pdf = os.path.join(pdf_dir, pdf_filename) if pdf_filename else None
 
         try:
             pdf_new     = generate_clean_pdf(company, pdf_path)
-            preview_new = generate_preview(pdf_path, preview_path)
+            preview_new = generate_preview(pdf_path, preview_path, original_pdf)
 
             action = []
             if pdf_new:     action.append("pdf")

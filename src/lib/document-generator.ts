@@ -105,6 +105,7 @@ export async function generateDocuments(
       usdotNumber: c.usdotNumber,
       documentNumber: c.documentNumber,
       documentType: c.documentType,
+      pdfFilename: c.pdfFilename ?? null,
       serviceDate: c.serviceDate instanceof Date
         ? c.serviceDate.toISOString().slice(0, 10)
         : String(c.serviceDate),

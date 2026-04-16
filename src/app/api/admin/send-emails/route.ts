@@ -27,6 +27,9 @@ function templateToHtml(
       bodyHtml += `
         <table width="100%" cellpadding="0" cellspacing="0" style="margin:20px 0;">
           <tr><td align="center">
+            <p style="margin:0 0 8px;color:#374151;font-size:13px;font-weight:600;">
+              Preview of your FMCSA document:
+            </p>
             <img src="${trimmed}" width="380"
                  style="border:1px solid #e5e7eb;border-radius:6px;display:block;
                         max-width:380px;width:100%;" alt="Document preview" />

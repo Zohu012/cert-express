@@ -1,9 +1,9 @@
-import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { getPriceCents } from "@/lib/settings";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { PublicLayout } from "@/components/public-layout";
+import { SearchResultCard } from "@/components/search-result-card";
 
 export default async function HomePage({
   searchParams,
@@ -106,66 +106,52 @@ export default async function HomePage({
         {companies.length > 0 && (
           <div className="space-y-4">
             <div className="flex items-center justify-between">
-              <p className="text-sm text-gray-500">
-                {companies.length} result{companies.length !== 1 ? "s" : ""}{" "}
-                found
+              <div className="flex items-center gap-2">
+                <p className="text-sm text-gray-500">
+                  {companies.length} result{companies.length !== 1 ? "s" : ""}{" "}
+                  found
+                </p>
+                {companies.length === 1 && (
+                  <span className="text-xs font-medium bg-green-100 text-green-700 px-2 py-0.5 rounded-full">
+                    Match Found
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {companies.map((company) => {
+              const d = new Date(company.serviceDate);
+              const dateStr = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}-${String(d.getUTCDate()).padStart(2, "0")}`;
+              return (
+                <SearchResultCard
+                  key={company.id}
+                  company={{
+                    id: company.id,
+                    companyName: company.companyName,
+                    dbaName: company.dbaName,
+                    usdotNumber: company.usdotNumber,
+                    documentNumber: company.documentNumber,
+                    documentType: company.documentType,
+                    serviceDate: dateStr,
+                    city: company.city,
+                    state: company.state,
+                    previewFilename: company.previewFilename,
+                  }}
+                  priceDisplay={priceDisplay}
+                />
+              );
+            })}
+
+            {/* Trust messaging + disclaimer */}
+            <div className="text-center pt-3 space-y-1">
+              <p className="text-xs text-gray-500">
+                Most carriers use this for onboarding and broker setup
+              </p>
+              <p className="text-xs text-gray-400">
+                Private service — not affiliated with FMCSA or U.S. Department
+                of Transportation
               </p>
             </div>
-            {companies.map((company) => (
-              <Card key={company.id} className="hover:shadow-md transition">
-                <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
-                  <div className="flex-1">
-                    <h3 className="font-semibold text-lg">
-                      {company.companyName}
-                    </h3>
-                    {company.dbaName && (
-                      <p className="text-sm text-gray-500">
-                        D/B/A {company.dbaName}
-                      </p>
-                    )}
-                    <div className="mt-2 flex flex-wrap gap-x-6 gap-y-1 text-sm text-gray-600">
-                      <span>
-                        <strong>DOT:</strong> {company.usdotNumber}
-                      </span>
-                      <span>
-                        <strong>{company.documentType}:</strong>{" "}
-                        {company.documentNumber}
-                      </span>
-                      <span>
-                        <strong>Date:</strong>{" "}
-                        {(() => { const d = new Date(company.serviceDate); return `${d.getUTCFullYear()}-${String(d.getUTCMonth()+1).padStart(2,"0")}-${String(d.getUTCDate()).padStart(2,"0")}`; })()}
-                      </span>
-                      <span>
-                        {company.city}, {company.state}
-                      </span>
-                    </div>
-                  </div>
-                  {company.previewFilename && (
-                    <Link href={`/pay/${company.id}`} className="flex-shrink-0 hidden sm:block">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={`/previews/${company.previewFilename}`}
-                        alt="Document preview"
-                        width={112}
-                        className="w-28 rounded border border-gray-200 shadow-sm hover:opacity-80 transition"
-                      />
-                    </Link>
-                  )}
-                  <Link
-                    href={`/pay/${company.id}`}
-                    className="inline-flex items-center justify-center rounded-lg bg-green-600 px-5 py-2.5 text-sm font-medium text-white hover:bg-green-700 transition whitespace-nowrap self-center"
-                  >
-                    Get a Copy &mdash; {priceDisplay}
-                  </Link>
-                </div>
-              </Card>
-            ))}
-
-            {/* Disclaimer under results */}
-            <p className="text-xs text-gray-400 text-center pt-2">
-              Documents are public records published by FMCSA. You are
-              purchasing a document retrieval and delivery service.
-            </p>
           </div>
         )}
 
