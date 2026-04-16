@@ -13,11 +13,13 @@ export async function sendEmail({
   subject,
   text,
   html,
+  attachments,
 }: {
   to: string;
   subject: string;
   text: string;
   html?: string;
+  attachments?: { filename: string; path: string; cid?: string }[];
 }) {
   const from = process.env.EMAIL_FROM || process.env.GMAIL_USER;
 
@@ -27,6 +29,7 @@ export async function sendEmail({
     subject,
     text,
     html,
+    attachments,
   });
 
   console.log(`[EMAIL] Sent to ${to}, messageId: ${info.messageId}`);

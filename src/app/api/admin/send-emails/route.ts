@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import path from "path";
 import { prisma } from "@/lib/db";
 import { verifySession } from "@/lib/auth";
 import { getSettings, getPriceCents } from "@/lib/settings";
@@ -220,11 +221,19 @@ export async function POST(req: NextRequest) {
       const textBody = interpolate(template);
       const htmlBody = templateToHtml(textBody, trackingUrl, appUrl, openPixelUrl);
 
+      const attachments = company.previewFilename
+        ? [{
+            filename: `preview-${company.documentNumber}.png`,
+            path: path.join(process.cwd(), "public", "previews", company.previewFilename),
+          }]
+        : undefined;
+
       await sendEmail({
         to: company.email,
         subject,
         text: textBody,
         html: htmlBody,
+        attachments,
       });
 
       // 3. Update log with resolved subject + mark company as sent
