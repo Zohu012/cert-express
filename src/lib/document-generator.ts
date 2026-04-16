@@ -5,7 +5,7 @@ const PYTHON_PATH  = process.env.PYTHON_PATH || "python";
 const SCRIPT_PATH  = path.join(process.cwd(), "scripts", "generate_documents.py");
 const PDF_DIR      = path.join(process.cwd(), "public", "pdfs");
 const PREVIEW_DIR  = path.join(process.cwd(), "public", "previews");
-const TIMEOUT_MS   = 10 * 60 * 1000; // 10 minutes
+const TIMEOUT_MS   = 60 * 60 * 1000; // 60 minutes
 
 type CompanyInput = {
   id: string;
@@ -38,7 +38,7 @@ export async function generateDocuments(
       if (!settled) {
         proc.kill();
         settled = true;
-        reject(new Error("[Document Generator] Safety timeout after 10 minutes"));
+        reject(new Error("[Document Generator] Safety timeout after 60 minutes"));
       }
     }, TIMEOUT_MS);
 
