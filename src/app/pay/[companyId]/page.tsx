@@ -117,29 +117,29 @@ export default async function PayPage({
               </summary>
               <div className="px-4 pb-4 pt-1">
                 <div className="grid grid-cols-2 gap-2 text-sm">
-                  <div>
+                  <div className="min-w-0">
                     <span className="text-gray-500">Company:</span>
                     <br />
-                    <strong>{company.companyName}</strong>
+                    <strong className="block break-words">{company.companyName}</strong>
                   </div>
                   {company.dbaName && (
-                    <div>
+                    <div className="min-w-0">
                       <span className="text-gray-500">DBA:</span>
                       <br />
-                      <strong>{company.dbaName}</strong>
+                      <strong className="block break-words">{company.dbaName}</strong>
                     </div>
                   )}
-                  <div>
+                  <div className="min-w-0">
                     <span className="text-gray-500">USDOT:</span>
                     <br />
-                    <strong>{company.usdotNumber}</strong>
+                    <strong className="block break-words">{company.usdotNumber}</strong>
                   </div>
-                  <div>
+                  <div className="min-w-0">
                     <span className="text-gray-500">Document:</span>
                     <br />
-                    <strong>{company.documentNumber}</strong>
+                    <strong className="block break-words">{company.documentNumber}</strong>
                   </div>
-                  <div>
+                  <div className="min-w-0">
                     <span className="text-gray-500">Type:</span>
                     <br />
                     <Badge
@@ -154,10 +154,10 @@ export default async function PayPage({
                       {company.documentType}
                     </Badge>
                   </div>
-                  <div>
+                  <div className="min-w-0">
                     <span className="text-gray-500">Date:</span>
                     <br />
-                    <strong>{dateStr}</strong>
+                    <strong className="block break-words">{dateStr}</strong>
                   </div>
                 </div>
                 {company.streetAddress && (
