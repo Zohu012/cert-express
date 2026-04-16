@@ -14,14 +14,27 @@ export async function sendEmail({
   text,
   html,
   attachments,
+  isBulk = false,
 }: {
   to: string;
   subject: string;
   text: string;
   html?: string;
   attachments?: { filename: string; path: string; cid?: string }[];
+  /** When true, adds List-Unsubscribe + Precedence:bulk headers required by Gmail for bulk senders. */
+  isBulk?: boolean;
 }) {
   const from = process.env.EMAIL_FROM || process.env.GMAIL_USER;
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://certexpresss.com";
+  const unsubscribeEmail = process.env.UNSUBSCRIBE_EMAIL || "unsubscribe@certexpresss.com";
+
+  const headers: Record<string, string> = {};
+  if (isBulk) {
+    // Gmail/Yahoo/Apple bulk-sender requirement: RFC 2369 + RFC 8058 one-click.
+    headers["List-Unsubscribe"] = `<mailto:${unsubscribeEmail}?subject=unsubscribe>, <${appUrl}/unsubscribe?email=${encodeURIComponent(to)}>`;
+    headers["List-Unsubscribe-Post"] = "List-Unsubscribe=One-Click";
+    headers["Precedence"] = "bulk";
+  }
 
   const info = await transporter.sendMail({
     from,
@@ -30,6 +43,7 @@ export async function sendEmail({
     text,
     html,
     attachments,
+    headers,
   });
 
   console.log(`[EMAIL] Sent to ${to}, messageId: ${info.messageId}`);
@@ -216,7 +230,7 @@ export async function sendOrderConfirmationEmail({
         <!-- Footer -->
         <tr>
           <td style="background:#f9fafb;border-top:1px solid #e5e7eb;padding:20px 40px;text-align:center;">
-            <p style="margin:0;color:#9ca3af;font-size:12px;">
+            <p style="margin:0;color:#6b7280;font-size:12px;">
               CertExpress &mdash; FMCSA Document Delivery Service<br>
               <a href="${appUrl}" style="color:#2563eb;">certexpresss.com</a>
             </p>

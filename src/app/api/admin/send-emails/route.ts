@@ -42,18 +42,23 @@ function templateToHtml(
       continue;
     }
 
-    // Payment link line → green button
+    // Payment link line → green button + text fallback (captures image-blocked/Outlook users)
     if (trimmed.includes(paymentLink)) {
       if (inList) { bodyHtml += "</ul>"; inList = false; }
       bodyHtml += `
-        <div style="text-align:center;margin:28px 0;">
+        <div style="text-align:center;margin:28px 0 8px;">
           <a href="${paymentLink}"
              style="display:inline-block;background:#16a34a;color:#ffffff;
                     text-decoration:none;padding:16px 48px;border-radius:8px;
                     font-size:16px;font-weight:bold;letter-spacing:0.2px;">
             Get a Copy of Your Document
           </a>
-        </div>`;
+        </div>
+        <p style="text-align:center;margin:0 0 20px;color:#6b7280;font-size:12px;line-height:1.5;">
+          Button not working? <a href="${paymentLink}" style="color:#2563eb;">Click here</a>
+          or copy &amp; paste this link:<br>
+          <a href="${paymentLink}" style="color:#2563eb;word-break:break-all;">${paymentLink}</a>
+        </p>`;
       continue;
     }
 
@@ -113,11 +118,11 @@ function templateToHtml(
         <!-- Footer -->
         <tr>
           <td style="background:#f9fafb;border-top:1px solid #e5e7eb;padding:16px 40px;text-align:center;">
-            <p style="margin:0;color:#9ca3af;font-size:12px;">
+            <p style="margin:0;color:#6b7280;font-size:12px;">
               CertExpress &mdash; FMCSA Document Delivery Service<br>
               <a href="${appUrl}" style="color:#2563eb;">${appUrl.replace(/https?:\/\//, "")}</a>
             </p>
-            <p style="margin:8px 0 0;color:#9ca3af;font-size:11px;">
+            <p style="margin:8px 0 0;color:#6b7280;font-size:11px;">
               CertExpress is a private service and is not affiliated with any government agency.
             </p>
           </td>
@@ -235,6 +240,7 @@ export async function POST(req: NextRequest) {
         text: textBody,
         html: htmlBody,
         attachments,
+        isBulk: true,
       });
 
       // 3. Update log with resolved subject + mark company as sent
