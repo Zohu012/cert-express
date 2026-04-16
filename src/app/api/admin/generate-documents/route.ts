@@ -20,13 +20,19 @@ export async function POST() {
 
   // Fire-and-forget — returns immediately so the HTTP request doesn't time out
   generateDocuments(companies)
-    .then((previewMap) => {
+    .then(async (previewMap) => {
       if (previewMap.size === 0) return;
-      return prisma.$transaction(
-        [...previewMap.entries()].map(([id, previewFilename]) =>
-          prisma.company.update({ where: { id }, data: { previewFilename } })
-        )
-      );
+      // Chunk updates to avoid SQLite socket timeout on large batches
+      const entries = [...previewMap.entries()];
+      const CHUNK = 50;
+      for (let i = 0; i < entries.length; i += CHUNK) {
+        const chunk = entries.slice(i, i + CHUNK);
+        await prisma.$transaction(
+          chunk.map(([id, previewFilename]) =>
+            prisma.company.update({ where: { id }, data: { previewFilename } })
+          )
+        );
+      }
     })
     .then(() => console.log(`[Document Generator] Batch complete — ${companies.length} processed`))
     .catch((err) => console.error("[Document Generator] Batch failed:", err));

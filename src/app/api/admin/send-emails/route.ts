@@ -174,7 +174,7 @@ export async function POST(req: NextRequest) {
   let failed = 0;
 
   for (const company of companies) {
-    if (!company.email) continue;
+    if (!company.email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(company.email)) continue;
 
     try {
       // 1. Create EmailLog record first to get tracking ID
