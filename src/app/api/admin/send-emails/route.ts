@@ -22,7 +22,7 @@ function templateToHtml(
   for (const line of lines) {
     const trimmed = line.trim();
 
-    // Preview image URL line → email-safe centered image block
+    // Preview image URL line → email-safe centered image block using CID
     if (/^https?:\/\/.+\.(png|jpg|jpeg)$/i.test(trimmed)) {
       if (inList) { bodyHtml += "</ul>"; inList = false; }
       bodyHtml += `
@@ -31,7 +31,7 @@ function templateToHtml(
             <p style="margin:0 0 8px;color:#374151;font-size:13px;font-weight:600;">
               Preview of your FMCSA document:
             </p>
-            <img src="${trimmed}" width="380"
+            <img src="cid:previewImage" width="380"
                  style="border:1px solid #e5e7eb;border-radius:6px;display:block;
                         max-width:380px;width:100%;" alt="Document preview" />
             <p style="margin:8px 0 0;color:#6b7280;font-size:12px;">
@@ -225,6 +225,7 @@ export async function POST(req: NextRequest) {
         ? [{
             filename: `preview-${company.documentNumber}.png`,
             path: path.join(process.cwd(), "public", "previews", company.previewFilename),
+            cid: "previewImage",
           }]
         : undefined;
 
