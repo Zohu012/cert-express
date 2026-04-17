@@ -5,10 +5,17 @@ import { verifySession } from "@/lib/auth";
 import { getSettings, getPriceCents } from "@/lib/settings";
 import { sendEmail } from "@/lib/email";
 
-/** Convert plain-text email template to HTML, turning the payment link into a button */
+/**
+ * Convert plain-text email template to HTML, turning the payment link into a button.
+ *
+ * `displayLink` is the clean URL shown to the user (e.g. https://…/pay/{id}).
+ * `trackUrl`    is the tracking-redirect URL used ONLY as the href on the button /
+ *               "Click here" anchor so clicks still log. Never shown as visible text.
+ */
 function templateToHtml(
   text: string,
-  paymentLink: string,
+  displayLink: string,
+  trackUrl: string,
   appUrl: string,
   openPixelUrl?: string,
 ): string {
@@ -43,11 +50,11 @@ function templateToHtml(
     }
 
     // Payment link line → green button + text fallback (captures image-blocked/Outlook users)
-    if (trimmed.includes(paymentLink)) {
+    if (trimmed.includes(displayLink)) {
       if (inList) { bodyHtml += "</ul>"; inList = false; }
       bodyHtml += `
         <div style="text-align:center;margin:28px 0 8px;">
-          <a href="${paymentLink}"
+          <a href="${trackUrl}"
              style="display:inline-block;background:#16a34a;color:#ffffff;
                     text-decoration:none;padding:16px 48px;border-radius:8px;
                     font-size:16px;font-weight:bold;letter-spacing:0.2px;">
@@ -55,9 +62,9 @@ function templateToHtml(
           </a>
         </div>
         <p style="text-align:center;margin:0 0 20px;color:#6b7280;font-size:12px;line-height:1.5;">
-          Button not working? <a href="${paymentLink}" style="color:#2563eb;">Click here</a>
+          Button not working? <a href="${trackUrl}" style="color:#2563eb;">Click here</a>
           or copy &amp; paste this link:<br>
-          <a href="${paymentLink}" style="color:#2563eb;word-break:break-all;">${paymentLink}</a>
+          <a href="${displayLink}" style="color:#2563eb;word-break:break-all;">${displayLink}</a>
         </p>`;
       continue;
     }
@@ -191,8 +198,11 @@ export async function POST(req: NextRequest) {
         },
       });
 
-      // 2. Use tracking URL so clicks are recorded; open pixel for read receipts
+      // 2. Tracking URL (used only as the href on buttons/links so clicks log);
+      //    payUrl is the clean, user-facing URL shown in visible text / plain-text body
+      //    so the message doesn't look phishy. Open pixel handles read receipts.
       const trackingUrl = `${appUrl}/api/track/${emailLog.id}`;
+      const payUrl = `${appUrl}/pay/${company.id}`;
       const openPixelUrl = `${appUrl}/api/track/open/${emailLog.id}`;
 
       const interpolate = (tpl: string) =>
@@ -209,7 +219,7 @@ export async function POST(req: NextRequest) {
             new Date(company.serviceDate).toLocaleDateString("en-US")
           )
           .replace(/\{\{price\}\}/g, `$${(priceCents / 100).toFixed(2)}`)
-          .replace(/\{\{paymentLink\}\}/g, trackingUrl)
+          .replace(/\{\{paymentLink\}\}/g, payUrl)
           .replace(
             /\{\{previewImageUrl\}\}/g,
             company.previewFilename
@@ -224,7 +234,7 @@ export async function POST(req: NextRequest) {
 
       const template = settings.email_body_template || DEFAULT_TEMPLATE;
       const textBody = interpolate(template);
-      const htmlBody = templateToHtml(textBody, trackingUrl, appUrl, openPixelUrl);
+      const htmlBody = templateToHtml(textBody, payUrl, trackingUrl, appUrl, openPixelUrl);
 
       const attachments = company.previewFilename
         ? [{
