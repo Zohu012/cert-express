@@ -147,31 +147,34 @@ function templateToHtml(
 
 const DEFAULT_TEMPLATE = `Hi {{companyName}} team,
 
-Your FMCSA {{documentType}} is now effective from {{serviceDate}}, registered under {{city}}, {{state}}.
+Your FMCSA {{documentType}} ({{documentNumber}}) for USDOT {{usdotNumber}} is now effective from {{serviceDate}} and registered under {{city}}, {{state}}.
+
+You can review a preview below to confirm it matches your company record:
 
 {{previewImageUrl}}
 
-This preview matches your company record — access the full PDF instantly below.
+This preview reflects your registration details — you can access the full PDF instantly here:
 
 {{paymentLink}}
 
 Why companies keep a copy on file:
-• Broker & shipper onboarding packets
+• Broker & shipper onboarding
 • Insurance underwriting
-• Compliance recordkeeping
-• Avoid 3–5 business day mail wait for the official copy
+• Compliance documentation
+• Avoid 3–5 business day wait for mailed copy
 
 What you receive:
 • Clean, print-ready PDF of your {{documentType}}
 • Instant download after checkout
-• Optional resend to your email
-• {{price}} one-time, no subscription
+• Easy to forward or upload
+• {{price}} one-time (no subscription)
 
-This is an independent document delivery service providing a convenient PDF copy based on FMCSA registration data. Not affiliated with FMCSA or the U.S. Department of Transportation. You can also wait to receive your copy by mail.
+This is an independent document delivery service. Not affiliated with FMCSA or the U.S. Department of Transportation. If you prefer, you can also wait to receive your official copy by mail.
 
-If you'd rather not receive these, reply with "remove" and we'll take you off the list.
+If you'd rather not receive these emails, reply with "remove" and we'll take you off the list.
 
-— Fuad
+Best regards,
+Ethan
 CertExpress`;
 
 export async function POST(req: NextRequest) {

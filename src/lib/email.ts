@@ -1,4 +1,5 @@
 import { Resend } from "resend";
+import fs from "fs/promises";
 
 // Lazily construct the Resend client so `new Resend()` doesn't throw at
 // module-eval time during build (when env vars aren't loaded).
@@ -44,12 +45,32 @@ export async function sendEmail({
   }
 
   // Translate caller's nodemailer-shape attachments into Resend's shape.
-  // `path` is supported natively by the Resend SDK; `cid` → `contentId` for inline images.
-  const resendAttachments = attachments?.map((a) => ({
-    filename: a.filename,
-    path: a.path,
-    contentId: a.cid,
-  }));
+  // Resend's SDK only treats `path` as a remote URL (must start with http/https);
+  // for local filesystem paths we must read the file and pass it as `content` (Buffer).
+  // If a file is missing on disk, we silently drop the attachment — the email body
+  // already has a graceful fallback (no inline preview, plain text + button still work).
+  const resendAttachments = attachments
+    ? (
+        await Promise.all(
+          attachments.map(async (a) => {
+            try {
+              const content = await fs.readFile(a.path);
+              return {
+                filename: a.filename,
+                content,
+                contentId: a.cid,
+              };
+            } catch (err) {
+              console.warn(
+                `[EMAIL] Skipping missing attachment ${a.path}:`,
+                (err as Error).message
+              );
+              return null;
+            }
+          })
+        )
+      ).filter((a): a is NonNullable<typeof a> => a !== null)
+    : undefined;
 
   const { data, error } = await getResend().emails.send({
     from,
