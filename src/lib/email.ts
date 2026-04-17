@@ -1,12 +1,17 @@
-import nodemailer from "nodemailer";
+import { Resend } from "resend";
 
-const transporter = nodemailer.createTransport({
-  service: "gmail",
-  auth: {
-    user: process.env.GMAIL_USER,
-    pass: process.env.GMAIL_APP_PASSWORD,
-  },
-});
+// Lazily construct the Resend client so `new Resend()` doesn't throw at
+// module-eval time during build (when env vars aren't loaded).
+let _resend: Resend | null = null;
+function getResend(): Resend {
+  if (!_resend) {
+    if (!process.env.RESEND_API_KEY) {
+      throw new Error("RESEND_API_KEY is not set");
+    }
+    _resend = new Resend(process.env.RESEND_API_KEY);
+  }
+  return _resend;
+}
 
 export async function sendEmail({
   to,
@@ -20,11 +25,13 @@ export async function sendEmail({
   subject: string;
   text: string;
   html?: string;
+  /** Inline/regular attachments. `path` is read from disk by Resend SDK; `cid` becomes the inline content_id. */
   attachments?: { filename: string; path: string; cid?: string }[];
   /** When true, adds List-Unsubscribe + Precedence:bulk headers required by Gmail for bulk senders. */
   isBulk?: boolean;
 }) {
-  const from = process.env.EMAIL_FROM || process.env.GMAIL_USER;
+  const from = process.env.EMAIL_FROM || "CertExpress <noreply@certexpresss.com>";
+  const replyTo = process.env.REPLY_TO_EMAIL;
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://certexpresss.com";
   const unsubscribeEmail = process.env.UNSUBSCRIBE_EMAIL || "unsubscribe@certexpresss.com";
 
@@ -36,18 +43,32 @@ export async function sendEmail({
     headers["Precedence"] = "bulk";
   }
 
-  const info = await transporter.sendMail({
+  // Translate caller's nodemailer-shape attachments into Resend's shape.
+  // `path` is supported natively by the Resend SDK; `cid` → `contentId` for inline images.
+  const resendAttachments = attachments?.map((a) => ({
+    filename: a.filename,
+    path: a.path,
+    contentId: a.cid,
+  }));
+
+  const { data, error } = await getResend().emails.send({
     from,
     to,
     subject,
     text,
     html,
-    attachments,
+    attachments: resendAttachments,
     headers,
+    ...(replyTo ? { replyTo } : {}),
   });
 
-  console.log(`[EMAIL] Sent to ${to}, messageId: ${info.messageId}`);
-  return info;
+  if (error) {
+    console.error(`[EMAIL] Resend error for ${to}:`, error);
+    throw new Error(`Resend send failed: ${error.message}`);
+  }
+
+  console.log(`[EMAIL] Sent to ${to}, id: ${data?.id}`);
+  return { messageId: data?.id };
 }
 
 // ─── Order Confirmation ──────────────────────────────────────────────────────

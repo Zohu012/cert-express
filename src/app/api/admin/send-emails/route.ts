@@ -18,6 +18,7 @@ function templateToHtml(
   trackUrl: string,
   appUrl: string,
   openPixelUrl?: string,
+  preheader?: string,
 ): string {
   const logoUrl = `${appUrl}/logo.png`;
 
@@ -42,7 +43,7 @@ function templateToHtml(
                  style="border:1px solid #e5e7eb;border-radius:6px;display:block;
                         max-width:380px;width:100%;" alt="Document preview" />
             <p style="margin:8px 0 0;color:#6b7280;font-size:12px;">
-              Preview &mdash; click below to unlock the full document
+              This preview matches your company record &mdash; access the full PDF instantly below.
             </p>
           </td></tr>
         </table>`;
@@ -58,7 +59,7 @@ function templateToHtml(
              style="display:inline-block;background:#16a34a;color:#ffffff;
                     text-decoration:none;padding:16px 48px;border-radius:8px;
                     font-size:16px;font-weight:bold;letter-spacing:0.2px;">
-            Get a Copy of Your Document
+            Access the Full PDF
           </a>
         </div>
         <p style="text-align:center;margin:0 0 20px;color:#6b7280;font-size:12px;line-height:1.5;">
@@ -100,6 +101,7 @@ function templateToHtml(
 <html lang="en">
 <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
 <body style="margin:0;padding:0;background:#f3f4f6;font-family:Arial,sans-serif;">
+  ${preheader ? `<div style="display:none;max-height:0;overflow:hidden;mso-hide:all;font-size:1px;line-height:1px;color:#f3f4f6;">${preheader}</div>` : ""}
   <table width="100%" cellpadding="0" cellspacing="0" style="background:#f3f4f6;padding:32px 0;">
     <tr><td align="center">
       <table width="600" cellpadding="0" cellspacing="0"
@@ -143,28 +145,34 @@ function templateToHtml(
 </html>`;
 }
 
-const DEFAULT_TEMPLATE = `Dear {{companyName}},
+const DEFAULT_TEMPLATE = `Hi {{companyName}} team,
 
-We identified that your FMCSA {{documentType}} has been successfully issued.
-
-Document Details:
-• Document Number: {{documentNumber}}
-• Service Date: {{serviceDate}}
-
-Your certificate is now available for immediate access.
+Your FMCSA {{documentType}} is now effective from {{serviceDate}}, registered under {{city}}, {{state}}.
 
 {{previewImageUrl}}
 
-You can securely retrieve a processed copy here:
+This preview matches your company record — access the full PDF instantly below.
 
 {{paymentLink}}
 
-Our service provides fast, structured delivery so you can access your document without delays.
+Why companies keep a copy on file:
+• Broker & shipper onboarding packets
+• Insurance underwriting
+• Compliance recordkeeping
+• Avoid 3–5 business day mail wait for the official copy
 
-If you have any questions, simply reply to this email.
+What you receive:
+• Clean, print-ready PDF of your {{documentType}}
+• Instant download after checkout
+• Optional resend to your email
+• {{price}} one-time, no subscription
 
-Best regards,
-CertExpress Team`;
+This is an independent document delivery service providing a convenient PDF copy based on FMCSA registration data. Not affiliated with FMCSA or the U.S. Department of Transportation. You can also wait to receive your copy by mail.
+
+If you'd rather not receive these, reply with "remove" and we'll take you off the list.
+
+— Fuad
+CertExpress`;
 
 export async function POST(req: NextRequest) {
   const adminId = await verifySession();
@@ -229,12 +237,15 @@ export async function POST(req: NextRequest) {
 
       const subject = interpolate(
         settings.email_subject ||
-          "Your FMCSA {{documentType}} is Ready – Get Your Copy"
+          "{{companyName}} — Your FMCSA {{documentType}} effective {{serviceDate}} (Preview Available)"
       );
 
       const template = settings.email_body_template || DEFAULT_TEMPLATE;
       const textBody = interpolate(template);
-      const htmlBody = templateToHtml(textBody, payUrl, trackingUrl, appUrl, openPixelUrl);
+      const preheader = interpolate(
+        "Preview available — access your FMCSA {{documentType}} PDF instantly."
+      );
+      const htmlBody = templateToHtml(textBody, payUrl, trackingUrl, appUrl, openPixelUrl, preheader);
 
       const attachments = company.previewFilename
         ? [{
