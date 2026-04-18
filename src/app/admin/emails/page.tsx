@@ -60,6 +60,7 @@ async function fetchCandidates(
 
   const candidates = companiesWithEmail.filter((c) => {
     if (!c.email || !c.usdotNumber) return false;
+    if (c.emailStatus === "unsubscribed") return false;
     const key = `${c.usdotNumber}:${c.email.toLowerCase().trim()}`;
     return !contactedSet.has(key);
   });

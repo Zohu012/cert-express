@@ -5,13 +5,18 @@ import { verifySession } from "@/lib/auth";
 import { getSettings, getPriceCents } from "@/lib/settings";
 import { sendEmail } from "@/lib/email";
 
-/**
- * Convert plain-text email template to HTML, turning the payment link into a button.
- *
- * `displayLink` is the clean URL shown to the user (e.g. https://…/pay/{id}).
- * `trackUrl`    is the tracking-redirect URL used ONLY as the href on the button /
- *               "Click here" anchor so clicks still log. Never shown as visible text.
- */
+/** Render **bold** markers and linkify bare https?:// URLs in a plain-text line. */
+function renderInline(line: string): string {
+  // **bold** → <strong>
+  let out = line.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
+  // bare URLs → clickable anchor
+  out = out.replace(
+    /(https?:\/\/[^\s<>"]+)/g,
+    '<a href="$1" style="color:#2563eb;word-break:break-all;">$1</a>'
+  );
+  return out;
+}
+
 function templateToHtml(
   text: string,
   displayLink: string,
@@ -30,6 +35,13 @@ function templateToHtml(
   for (const line of lines) {
     const trimmed = line.trim();
 
+    // Horizontal rule --- → visual divider
+    if (trimmed === "---") {
+      if (inList) { bodyHtml += "</ul>"; inList = false; }
+      bodyHtml += `<hr style="border:none;border-top:1px solid #e5e7eb;margin:16px 0;">`;
+      continue;
+    }
+
     // Preview image URL line → email-safe centered image block using CID
     if (/^https?:\/\/.+\.(png|jpg|jpeg)$/i.test(trimmed)) {
       if (inList) { bodyHtml += "</ul>"; inList = false; }
@@ -43,7 +55,7 @@ function templateToHtml(
                  style="border:1px solid #e5e7eb;border-radius:6px;display:block;
                         max-width:380px;width:100%;" alt="Document preview" />
             <p style="margin:8px 0 0;color:#6b7280;font-size:12px;">
-              This preview matches your company record &mdash; access the full PDF instantly below.
+              This is a blurred preview — purchase below to get the full PDF.
             </p>
           </td></tr>
         </table>`;
@@ -59,7 +71,7 @@ function templateToHtml(
              style="display:inline-block;background:#16a34a;color:#ffffff;
                     text-decoration:none;padding:16px 48px;border-radius:8px;
                     font-size:16px;font-weight:bold;letter-spacing:0.2px;">
-            Access the Full PDF
+            Get PDF Copy
           </a>
         </div>
         <p style="text-align:center;margin:0 0 20px;color:#6b7280;font-size:12px;line-height:1.5;">
@@ -73,7 +85,7 @@ function templateToHtml(
     // Bullet point lines
     if (trimmed.startsWith("•") || trimmed.startsWith("-")) {
       if (!inList) { bodyHtml += '<ul style="margin:8px 0;padding-left:20px;">'; inList = true; }
-      bodyHtml += `<li style="padding:3px 0;color:#374151;font-size:14px;">${trimmed.replace(/^[•\-]\s*/, "")}</li>`;
+      bodyHtml += `<li style="padding:3px 0;color:#374151;font-size:14px;">${renderInline(trimmed.replace(/^[•\-]\s*/, ""))}</li>`;
       continue;
     }
 
@@ -87,12 +99,12 @@ function templateToHtml(
 
     // Section headings (e.g. "Document Details:")
     if (trimmed.endsWith(":") && trimmed.length < 40) {
-      bodyHtml += `<p style="margin:14px 0 4px;font-weight:bold;color:#111827;font-size:14px;">${trimmed}</p>`;
+      bodyHtml += `<p style="margin:14px 0 4px;font-weight:bold;color:#111827;font-size:14px;">${renderInline(trimmed)}</p>`;
       continue;
     }
 
-    // Regular line
-    bodyHtml += `<p style="margin:4px 0;color:#374151;font-size:14px;line-height:1.6;">${trimmed}</p>`;
+    // Regular line (with inline bold + link rendering)
+    bodyHtml += `<p style="margin:4px 0;color:#374151;font-size:14px;line-height:1.6;">${renderInline(trimmed)}</p>`;
   }
 
   if (inList) bodyHtml += "</ul>";
@@ -147,31 +159,36 @@ function templateToHtml(
 
 const DEFAULT_TEMPLATE = `Hi {{companyName}} team,
 
-Your FMCSA {{documentType}} ({{documentNumber}}) for USDOT {{usdotNumber}} is now effective from {{serviceDate}} and registered under {{city}}, {{state}}.
+We noticed that FMCSA issued your {{documentType}} ({{documentNumber}}) for USDOT {{usdotNumber}} on {{serviceDate}}.
 
-You can review a preview below to confirm it matches your company record:
+If you need a PDF copy for your records, we offer an instant download for {{price}}.
+
+This is a **paid third-party document service** and is not affiliated with FMCSA. You can verify your authority status directly through official FMCSA systems.
+
+---
 
 {{previewImageUrl}}
 
-This preview reflects your registration details — you can access the full PDF instantly here:
-
 {{paymentLink}}
 
-Why companies keep a copy on file:
-• Broker & shipper onboarding
-• Insurance underwriting
-• Compliance documentation
-• Avoid 3–5 business day wait for mailed copy
+---
 
-What you receive:
-• Clean, print-ready PDF of your {{documentType}}
-• Instant download after checkout
-• Easy to forward or upload
-• {{price}} one-time (no subscription)
+Why some companies choose a copy:
+• Keep a PDF on file for internal records
+• Share with brokers or insurance
+• Avoid searching/downloading manually
 
-This is an independent document delivery service. Not affiliated with FMCSA or the U.S. Department of Transportation. If you prefer, you can also wait to receive your official copy by mail.
+What you'll receive:
+• PDF copy matching your FMCSA registration
+• Instant download after payment
+• Easy to save, forward, and upload
 
-If you'd rather not receive these emails, reply with "remove" and we'll take you off the list.
+---
+
+Questions? Just reply to this email.
+
+Unsubscribe: {{unsubscribeLink}}
+{{companyAddress}}
 
 Best regards,
 Ethan
@@ -198,6 +215,7 @@ export async function POST(req: NextRequest) {
 
   for (const company of companies) {
     if (!company.email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(company.email)) continue;
+    if (company.emailStatus === "unsubscribed") continue;
 
     try {
       // 1. Create EmailLog record first to get tracking ID
@@ -236,17 +254,22 @@ export async function POST(req: NextRequest) {
             company.previewFilename
               ? `${appUrl}/previews/${company.previewFilename}`
               : ""
-          );
+          )
+          .replace(
+            /\{\{unsubscribeLink\}\}/g,
+            `${appUrl}/unsubscribe?email=${encodeURIComponent(company.email!)}`
+          )
+          .replace(/\{\{companyAddress\}\}/g, process.env.COMPANY_ADDRESS || "");
 
       const subject = interpolate(
         settings.email_subject ||
-          "{{companyName}} — Your FMCSA {{documentType}} effective {{serviceDate}} (Preview Available)"
+          "PDF copy of your FMCSA {{documentType}} ({{documentNumber}}) — {{price}}"
       );
 
       const template = settings.email_body_template || DEFAULT_TEMPLATE;
       const textBody = interpolate(template);
       const preheader = interpolate(
-        "Preview available — access your FMCSA {{documentType}} PDF instantly."
+        "Paid third-party service. Convenience PDF copy for {{price}}. Not affiliated with FMCSA."
       );
       const htmlBody = templateToHtml(textBody, payUrl, trackingUrl, appUrl, openPixelUrl, preheader);
 
