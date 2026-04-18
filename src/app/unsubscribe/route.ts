@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { addToUnsubscribeList } from "@/lib/unsubscribe-list";
 
 function confirmationHtml(email: string) {
   const resubscribeUrl = `/resubscribe?email=${encodeURIComponent(email)}`;
@@ -30,6 +31,10 @@ function confirmationHtml(email: string) {
 
 async function unsubscribeEmail(email: string | null) {
   if (!email) return;
+  // Source of truth: blocklist (works even when no Company has this email
+  // and is case-insensitive).
+  await addToUnsubscribeList(email);
+  // Also mark matching Company rows for backward-compat + UI joins.
   await prisma.company.updateMany({
     where: { email },
     data: { emailStatus: "unsubscribed" },

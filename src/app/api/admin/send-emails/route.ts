@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db";
 import { verifySession } from "@/lib/auth";
 import { getSettings, getPriceCents } from "@/lib/settings";
 import { sendEmail } from "@/lib/email";
+import { getUnsubscribeList } from "@/lib/unsubscribe-list";
 
 /** Render **bold** markers and linkify bare https?:// URLs in a plain-text line. */
 function renderInline(line: string): string {
@@ -211,6 +212,7 @@ export async function POST(req: NextRequest) {
   const settings = await getSettings(["email_subject", "email_body_template"]);
   const priceCents = await getPriceCents();
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+  const blocklist = new Set(await getUnsubscribeList()); // lowercased
 
   let sent = 0;
   let failed = 0;
@@ -218,6 +220,7 @@ export async function POST(req: NextRequest) {
   for (const company of companies) {
     if (!company.email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(company.email)) continue;
     if (company.emailStatus === "unsubscribed") continue;
+    if (blocklist.has(company.email.trim().toLowerCase())) continue;
 
     try {
       // 1. Create EmailLog record first to get tracking ID

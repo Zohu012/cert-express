@@ -3,31 +3,30 @@
 import Link from "next/link";
 import { Card } from "@/components/ui/card";
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 
-interface UnsubscribedCompany {
-  id: string;
-  companyName: string;
-  email: string | null;
-  usdotNumber: string;
-  documentType: string;
+interface UnsubRow {
+  email: string;
+  companyName: string | null;
+  usdotNumber: string | null;
+  documentType: string | null;
   emailSentAt: string | null;
+  source: "user" | "admin" | "company";
 }
 
 export default function UnsubscribedPage() {
-  const router = useRouter();
-  const [companies, setCompanies] = useState<UnsubscribedCompany[]>([]);
+  const [rows, setRows] = useState<UnsubRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [email, setEmail] = useState("");
   const [status, setStatus] = useState<"idle" | "saving" | "done" | "error">("idle");
   const [errorMsg, setErrorMsg] = useState("");
+  const [reloadTick, setReloadTick] = useState(0);
 
   useEffect(() => {
     fetch("/api/admin/unsubscribed-list")
       .then((r) => r.json())
-      .then((data) => setCompanies(data))
+      .then((data) => setRows(Array.isArray(data) ? data : []))
       .finally(() => setLoading(false));
-  }, [status]); // refetch after a successful add
+  }, [reloadTick]);
 
   async function handleAdd(e: React.FormEvent) {
     e.preventDefault();
@@ -42,6 +41,7 @@ export default function UnsubscribedPage() {
     if (res.ok) {
       setEmail("");
       setStatus("done");
+      setReloadTick((n) => n + 1);
       setTimeout(() => setStatus("idle"), 2000);
     } else {
       const data = await res.json();
@@ -50,10 +50,19 @@ export default function UnsubscribedPage() {
     }
   }
 
+  async function handleRemove(emailToRemove: string) {
+    if (!confirm(`Resubscribe ${emailToRemove}?`)) return;
+    const res = await fetch(
+      `/api/admin/unsubscribe?email=${encodeURIComponent(emailToRemove)}`,
+      { method: "DELETE" }
+    );
+    if (res.ok) setReloadTick((n) => n + 1);
+  }
+
   return (
     <div className="max-w-5xl mx-auto px-4 py-8">
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold">Unsubscribed ({companies.length})</h1>
+        <h1 className="text-2xl font-bold">Unsubscribed ({rows.length})</h1>
         <Link
           href="/admin/emails"
           className="rounded-lg border border-gray-300 px-4 py-2 text-sm hover:bg-gray-50"
@@ -94,31 +103,51 @@ export default function UnsubscribedPage() {
       <Card>
         {loading ? (
           <p className="text-gray-400 text-sm">Loading…</p>
-        ) : companies.length === 0 ? (
+        ) : rows.length === 0 ? (
           <p className="text-gray-400 text-sm">No unsubscribed contacts yet.</p>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b text-left text-gray-500">
-                  <th className="pb-2 pr-4 font-medium">Company</th>
                   <th className="pb-2 pr-4 font-medium">Email</th>
+                  <th className="pb-2 pr-4 font-medium">Company</th>
                   <th className="pb-2 pr-4 font-medium">USDOT</th>
-                  <th className="pb-2 pr-4 font-medium">Document</th>
-                  <th className="pb-2 font-medium">Last Emailed</th>
+                  <th className="pb-2 pr-4 font-medium">Source</th>
+                  <th className="pb-2 pr-4 font-medium">Last Emailed</th>
+                  <th className="pb-2 font-medium"></th>
                 </tr>
               </thead>
               <tbody>
-                {companies.map((c) => (
-                  <tr key={c.id} className="border-b last:border-0">
-                    <td className="py-2 pr-4 font-medium">{c.companyName}</td>
-                    <td className="py-2 pr-4 text-gray-600">{c.email}</td>
-                    <td className="py-2 pr-4 text-gray-600">{c.usdotNumber}</td>
-                    <td className="py-2 pr-4 text-gray-600">{c.documentType}</td>
-                    <td className="py-2 text-gray-500">
-                      {c.emailSentAt
-                        ? new Date(c.emailSentAt).toLocaleDateString("en-US")
+                {rows.map((r) => (
+                  <tr key={r.email} className="border-b last:border-0">
+                    <td className="py-2 pr-4 font-medium">{r.email}</td>
+                    <td className="py-2 pr-4 text-gray-600">{r.companyName || "—"}</td>
+                    <td className="py-2 pr-4 text-gray-600">{r.usdotNumber || "—"}</td>
+                    <td className="py-2 pr-4">
+                      <span className={
+                        "inline-block text-xs px-2 py-0.5 rounded " +
+                        (r.source === "admin"
+                          ? "bg-amber-100 text-amber-800"
+                          : r.source === "user"
+                          ? "bg-blue-100 text-blue-800"
+                          : "bg-gray-100 text-gray-700")
+                      }>
+                        {r.source === "admin" ? "Admin-added" : r.source === "user" ? "User opt-out" : "Company"}
+                      </span>
+                    </td>
+                    <td className="py-2 pr-4 text-gray-500">
+                      {r.emailSentAt
+                        ? new Date(r.emailSentAt).toLocaleDateString("en-US")
                         : "—"}
+                    </td>
+                    <td className="py-2 text-right">
+                      <button
+                        onClick={() => handleRemove(r.email)}
+                        className="text-xs text-blue-600 hover:underline"
+                      >
+                        Resubscribe
+                      </button>
                     </td>
                   </tr>
                 ))}

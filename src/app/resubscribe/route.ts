@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { removeFromUnsubscribeList } from "@/lib/unsubscribe-list";
 
 const CONFIRMATION_HTML = `<!DOCTYPE html>
 <html lang="en">
@@ -29,6 +30,7 @@ const CONFIRMATION_HTML = `<!DOCTYPE html>
 export async function GET(req: NextRequest) {
   const email = req.nextUrl.searchParams.get("email");
   if (email) {
+    await removeFromUnsubscribeList(email);
     await prisma.company.updateMany({
       where: { email, emailStatus: "unsubscribed" },
       data: { emailStatus: null },

@@ -4,6 +4,7 @@ import { EmailCampaignTable } from "@/components/email-campaign-table";
 import { verifySession } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
+import { getUnsubscribeList } from "@/lib/unsubscribe-list";
 
 export const dynamic = "force-dynamic";
 
@@ -58,9 +59,12 @@ async function fetchCandidates(
     orderBy: { createdAt: "desc" },
   });
 
+  const blocklist = new Set(await getUnsubscribeList()); // lowercased
+
   const candidates = companiesWithEmail.filter((c) => {
     if (!c.email || !c.usdotNumber) return false;
     if (c.emailStatus === "unsubscribed") return false;
+    if (blocklist.has(c.email.toLowerCase().trim())) return false;
     const key = `${c.usdotNumber}:${c.email.toLowerCase().trim()}`;
     return !contactedSet.has(key);
   });
