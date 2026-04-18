@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 
-const CONFIRMATION_HTML = `<!DOCTYPE html>
+function confirmationHtml(email: string) {
+  const resubscribeUrl = `/resubscribe?email=${encodeURIComponent(email)}`;
+  return `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
@@ -20,10 +22,11 @@ const CONFIRMATION_HTML = `<!DOCTYPE html>
   <div class="wrap">
     <h1>You've been unsubscribed</h1>
     <p>You will no longer receive promotional emails from CertExpress.</p>
-    <p>If this was a mistake, <a href="/">visit our site</a> or reply to any previous email to re-enable.</p>
+    <p style="font-size:13px;">Did this by mistake? <a href="${resubscribeUrl}">Resubscribe</a></p>
   </div>
 </body>
 </html>`;
+}
 
 async function unsubscribeEmail(email: string | null) {
   if (!email) return;
@@ -33,11 +36,11 @@ async function unsubscribeEmail(email: string | null) {
   });
 }
 
-/** GET /unsubscribe?email=... — browser click from email body */
+/** GET /unsubscribe?email=... — browser click from email footer */
 export async function GET(req: NextRequest) {
-  const email = req.nextUrl.searchParams.get("email");
+  const email = req.nextUrl.searchParams.get("email") ?? "";
   await unsubscribeEmail(email);
-  return new NextResponse(CONFIRMATION_HTML, {
+  return new NextResponse(confirmationHtml(email), {
     status: 200,
     headers: { "Content-Type": "text/html; charset=utf-8" },
   });

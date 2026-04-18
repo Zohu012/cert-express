@@ -106,12 +106,20 @@ export default async function EmailsPage({
     <div className="max-w-7xl mx-auto px-4 py-8">
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold">Email Campaigns ({total.toLocaleString()})</h1>
-        <Link
-          href="/admin/emails/history"
-          className="rounded-lg border border-gray-300 px-4 py-2 text-sm hover:bg-gray-50"
-        >
-          View History →
-        </Link>
+        <div className="flex gap-2">
+          <Link
+            href="/admin/emails/unsubscribed"
+            className="rounded-lg border border-gray-300 px-4 py-2 text-sm hover:bg-gray-50"
+          >
+            Unsubscribed
+          </Link>
+          <Link
+            href="/admin/emails/history"
+            className="rounded-lg border border-gray-300 px-4 py-2 text-sm hover:bg-gray-50"
+          >
+            View History →
+          </Link>
+        </div>
       </div>
 
       <Card>

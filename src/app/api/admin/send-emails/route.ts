@@ -24,6 +24,7 @@ function templateToHtml(
   appUrl: string,
   openPixelUrl?: string,
   preheader?: string,
+  unsubscribeUrl?: string,
 ): string {
   const logoUrl = `${appUrl}/logo.png`;
 
@@ -146,6 +147,10 @@ function templateToHtml(
             <p style="margin:8px 0 0;color:#6b7280;font-size:11px;">
               CertExpress is a private service and is not affiliated with any government agency.
             </p>
+            ${unsubscribeUrl ? `
+            <p style="margin:8px 0 0;font-size:11px;">
+              <a href="${unsubscribeUrl}" style="color:#9ca3af;">Unsubscribe</a>
+            </p>` : ""}
           </td>
         </tr>
 
@@ -186,9 +191,6 @@ What you'll receive:
 ---
 
 Questions? Just reply to this email.
-
-Unsubscribe: {{unsubscribeLink}}
-{{companyAddress}}
 
 Best regards,
 Ethan
@@ -271,7 +273,8 @@ export async function POST(req: NextRequest) {
       const preheader = interpolate(
         "Paid third-party service. Convenience PDF copy for {{price}}. Not affiliated with FMCSA."
       );
-      const htmlBody = templateToHtml(textBody, payUrl, trackingUrl, appUrl, openPixelUrl, preheader);
+      const unsubscribeUrl = `${appUrl}/unsubscribe?email=${encodeURIComponent(company.email!)}`;
+      const htmlBody = templateToHtml(textBody, payUrl, trackingUrl, appUrl, openPixelUrl, preheader, unsubscribeUrl);
 
       const attachments = company.previewFilename
         ? [{
