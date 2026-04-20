@@ -7,6 +7,7 @@ import { Card } from "@/components/ui/card";
 import type { Prisma } from "@prisma/client";
 import Link from "next/link";
 import { DeleteEmailLogButton } from "@/components/delete-email-log-button";
+import { EmailRateChart, type DailyStat } from "@/components/email-rate-chart";
 
 // ─── Sortable columns ────────────────────────────────────────────────────────
 const SORTABLE_COLS = [
@@ -165,6 +166,98 @@ export default async function EmailHistoryPage({
     ? `$${(revenueCents / 100 / statsSent).toFixed(2)}`
     : "$0.00";
 
+  // ── Per-day rates for last 30 days (used by the trend chart) ──────────────
+  //    Independent of active filters — always reflects all-time data for the
+  //    trailing 30-day window so the chart stays a stable trend view.
+  const dailyStats: DailyStat[] = await (async () => {
+    const DAYS = 30;
+    const now = new Date();
+    const todayMidnight = new Date(
+      now.getFullYear(),
+      now.getMonth(),
+      now.getDate()
+    );
+    const start = new Date(todayMidnight);
+    start.setDate(start.getDate() - (DAYS - 1));
+    const end = new Date(todayMidnight);
+    end.setDate(end.getDate() + 1); // exclusive upper bound = tomorrow 00:00
+
+    // Build the 30-day keys up front so empty days still render
+    const keys: string[] = [];
+    for (let i = 0; i < DAYS; i++) {
+      const d = new Date(start);
+      d.setDate(start.getDate() + i);
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, "0");
+      const dd = String(d.getDate()).padStart(2, "0");
+      keys.push(`${y}-${m}-${dd}`);
+    }
+
+    function dayKey(d: Date) {
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, "0");
+      const dd = String(d.getDate()).padStart(2, "0");
+      return `${y}-${m}-${dd}`;
+    }
+
+    const logsInRange = await prisma.emailLog.findMany({
+      where: { sentAt: { gte: start, lt: end } },
+      select: {
+        sentAt: true,
+        clickCount: true,
+        companyId: true,
+      },
+    });
+
+    // Per-day counters
+    const sentBy = new Map<string, number>();
+    const clickedBy = new Map<string, number>();
+    for (const k of keys) {
+      sentBy.set(k, 0);
+      clickedBy.set(k, 0);
+    }
+
+    // firstEmail[companyId] within the 30-day window
+    const firstEmail = new Map<string, Date>();
+    for (const log of logsInRange) {
+      const k = dayKey(log.sentAt);
+      sentBy.set(k, (sentBy.get(k) ?? 0) + 1);
+      if (log.clickCount > 0) {
+        clickedBy.set(k, (clickedBy.get(k) ?? 0) + 1);
+      }
+      const prev = firstEmail.get(log.companyId);
+      if (!prev || log.sentAt < prev) firstEmail.set(log.companyId, log.sentAt);
+    }
+
+    const ids = [...firstEmail.keys()];
+    const orders = ids.length
+      ? await prisma.order.findMany({
+          where: { companyId: { in: ids }, status: "completed" },
+          select: { companyId: true, createdAt: true },
+        })
+      : [];
+
+    // Conversions attributed to day D = paid orders from companies whose
+    // first email in the 30-day window was on day D (and order was on/after it)
+    const convBy = new Map<string, number>();
+    for (const k of keys) convBy.set(k, 0);
+    for (const o of orders) {
+      const first = firstEmail.get(o.companyId);
+      if (!first) continue;
+      if (o.createdAt < first) continue;
+      const k = dayKey(first);
+      if (!convBy.has(k)) continue;
+      convBy.set(k, (convBy.get(k) ?? 0) + 1);
+    }
+
+    return keys.map((k) => ({
+      date: k,
+      sent: sentBy.get(k) ?? 0,
+      clicked: clickedBy.get(k) ?? 0,
+      conversions: convBy.get(k) ?? 0,
+    }));
+  })();
+
   const statsLabelParts: string[] = [];
   if (dateFrom || dateTo) {
     statsLabelParts.push(`${dateFrom || "start"} → ${dateTo || "today"}`);
@@ -251,6 +344,9 @@ export default async function EmailHistoryPage({
           ))}
         </div>
       </div>
+
+      {/* ── Rate trend chart ── */}
+      <EmailRateChart data={dailyStats} />
 
       {/* ── Filters ── */}
       <Card className="mb-4">
