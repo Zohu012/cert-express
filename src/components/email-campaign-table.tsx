@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { ConfirmDialog } from "./confirm-dialog";
 
 interface Company {
   id: string;
@@ -17,6 +18,8 @@ export function EmailCampaignTable({ companies }: { companies: Company[] }) {
   const router = useRouter();
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [sending, setSending] = useState(false);
+  const [excluding, setExcluding] = useState(false);
+  const [confirmExclude, setConfirmExclude] = useState(false);
   const [result, setResult] = useState<string | null>(null);
 
   function toggleAll() {
@@ -46,7 +49,7 @@ export function EmailCampaignTable({ companies }: { companies: Company[] }) {
         body: JSON.stringify({ companyIds: Array.from(selected) }),
       });
       const data = await res.json();
-      setResult(`Sent: ${data.sent}, Failed: ${data.failed}`);
+      setResult(`Sent: ${data.sent}, Failed: ${data.failed}${typeof data.skipped === "number" ? `, Skipped: ${data.skipped}` : ""}`);
       setSelected(new Set());
       router.refresh();
     } catch {
@@ -56,6 +59,34 @@ export function EmailCampaignTable({ companies }: { companies: Company[] }) {
     }
   }
 
+  async function excludeCompanies() {
+    if (selected.size === 0) return;
+    setExcluding(true);
+    setResult(null);
+    try {
+      const res = await fetch("/api/admin/exclude-companies", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ companyIds: Array.from(selected) }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setResult(data.error || "Failed to exclude companies");
+      } else {
+        setResult(`${data.excluded} companies moved to excluded list`);
+      }
+      setSelected(new Set());
+      setConfirmExclude(false);
+      router.refresh();
+    } catch {
+      setResult("Failed to exclude companies");
+    } finally {
+      setExcluding(false);
+    }
+  }
+
+  const count = selected.size;
+
   return (
     <div className="space-y-3">
       {result && (
@@ -64,16 +95,27 @@ export function EmailCampaignTable({ companies }: { companies: Company[] }) {
         </div>
       )}
 
-      <div className="flex justify-between items-center">
-        <button
-          onClick={sendEmails}
-          disabled={sending || selected.size === 0}
-          className="rounded-lg bg-blue-600 px-4 py-2 text-sm text-white hover:bg-blue-700 disabled:opacity-50"
-        >
-          {sending
-            ? "Sending..."
-            : `Send to ${selected.size} ${selected.size === 1 ? "company" : "companies"}`}
-        </button>
+      <div className="flex justify-between items-center flex-wrap gap-2">
+        <div className="flex gap-2 flex-wrap">
+          <button
+            onClick={sendEmails}
+            disabled={sending || excluding || count === 0}
+            className="rounded-lg bg-blue-600 px-4 py-2 text-sm text-white hover:bg-blue-700 disabled:opacity-50"
+          >
+            {sending
+              ? "Sending..."
+              : `Send to ${count} ${count === 1 ? "company" : "companies"}`}
+          </button>
+          <button
+            onClick={() => setConfirmExclude(true)}
+            disabled={sending || excluding || count === 0}
+            className="rounded-lg bg-red-600 px-4 py-2 text-sm text-white hover:bg-red-700 disabled:opacity-50"
+          >
+            {excluding
+              ? "Excluding..."
+              : `Exclude ${count} ${count === 1 ? "company" : "companies"}`}
+          </button>
+        </div>
       </div>
 
       <div className="overflow-x-auto">
@@ -83,7 +125,7 @@ export function EmailCampaignTable({ companies }: { companies: Company[] }) {
               <th className="pb-2 pr-3">
                 <input
                   type="checkbox"
-                  checked={selected.size === companies.length}
+                  checked={companies.length > 0 && selected.size === companies.length}
                   onChange={toggleAll}
                 />
               </th>
@@ -112,6 +154,18 @@ export function EmailCampaignTable({ companies }: { companies: Company[] }) {
           </tbody>
         </table>
       </div>
+
+      <ConfirmDialog
+        open={confirmExclude}
+        title="Exclude selected companies?"
+        message="These companies will be removed from the send queue and added to the excluded list. You can restore them later."
+        confirmLabel="Confirm (Exclude)"
+        cancelLabel="Cancel"
+        variant="danger"
+        loading={excluding}
+        onConfirm={excludeCompanies}
+        onCancel={() => setConfirmExclude(false)}
+      />
     </div>
   );
 }

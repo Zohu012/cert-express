@@ -42,6 +42,7 @@ model Company {
   sourcePdf      SourcePdf @relation(fields: [sourcePdfId], references: [id])
   orders         Order[]
   emailLogs      EmailLog[]
+  excluded       ExcludedCompany?
   createdAt      DateTime  @default(now())
 
   @@unique([usdotNumber, documentNumber])
@@ -88,9 +89,23 @@ model EmailLog {
   lastClickAt DateTime?
   openCount   Int       @default(0)
   firstOpenAt DateTime?
+  status      String    @default("sent")   // "sent" | "failed" | "skipped"
+  skipReason  String?                       // "excluded" | "already_sent" | "outside_date_range" | "blocklist" | "invalid_email" | "unsubscribed"
+  source      String    @default("manual") // "manual" | "auto"
 
   @@index([companyId])
   @@index([sentAt])
+  @@index([status])
+  @@index([source])
+}
+
+model ExcludedCompany {
+  id         String   @id @default(uuid())
+  companyId  String   @unique
+  company    Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  excludedAt DateTime @default(now())
+
+  @@index([excludedAt])
 }
 
 model Setting {

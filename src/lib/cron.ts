@@ -1,6 +1,7 @@
 import cron from "node-cron";
 import { fetchDailyPdf } from "./pdf-fetcher";
 import { getSetting } from "./settings";
+import { runAutoSenderTick } from "./email-auto-sender";
 
 export type CronTimeSlot = { hourUTC: number; minute: number; enabled: boolean };
 
@@ -74,6 +75,23 @@ export async function startCronJobs() {
 
   if (enabled.length === 0) {
     console.warn("[CRON] No enabled time slots — auto-fetch is off.");
+  }
+
+  // Auto-email sender tick — runs every 30 seconds; the tick itself is a no-op
+  // when automation is disabled or outside the configured window.
+  const autoEmailExpr = "*/30 * * * * *";
+  if (cron.validate(autoEmailExpr)) {
+    const autoEmailTask = cron.schedule(autoEmailExpr, async () => {
+      try {
+        await runAutoSenderTick();
+      } catch (err) {
+        console.error("[CRON] Auto-email tick failed:", err);
+      }
+    });
+    activeTasks.push(autoEmailTask);
+    console.log("[CRON] Auto-email sender tick scheduled every 30s");
+  } else {
+    console.warn("[CRON] Invalid auto-email cron expression — skipping");
   }
 }
 

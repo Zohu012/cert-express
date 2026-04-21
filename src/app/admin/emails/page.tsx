@@ -41,10 +41,14 @@ async function fetchCandidates(
     }
   }
 
-  // All companies with a non-empty email
+  // All companies with a non-empty email, excluding companies on the exclusion list
   const companiesWithEmail = await prisma.company.findMany({
     where: {
-      AND: [{ email: { not: null } }, { email: { not: "" } }],
+      AND: [
+        { email: { not: null } },
+        { email: { not: "" } },
+        { excluded: { is: null } },
+      ],
     },
     select: {
       id: true,
@@ -108,9 +112,21 @@ export default async function EmailsPage({
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-8">
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex items-center justify-between mb-6 flex-wrap gap-2">
         <h1 className="text-2xl font-bold">Email Campaigns ({total.toLocaleString()})</h1>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
+          <Link
+            href="/admin/emails/automation"
+            className="rounded-lg border border-gray-300 px-4 py-2 text-sm hover:bg-gray-50"
+          >
+            Automation
+          </Link>
+          <Link
+            href="/admin/emails/excluded"
+            className="rounded-lg border border-gray-300 px-4 py-2 text-sm hover:bg-gray-50"
+          >
+            Excluded
+          </Link>
           <Link
             href="/admin/emails/unsubscribed"
             className="rounded-lg border border-gray-300 px-4 py-2 text-sm hover:bg-gray-50"
