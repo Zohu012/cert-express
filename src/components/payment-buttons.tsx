@@ -4,12 +4,28 @@ import { useState } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 
+type Gtag = (
+  command: "event",
+  action: string,
+  params?: Record<string, unknown>
+) => void;
+
+function track(action: string, params?: Record<string, unknown>) {
+  if (typeof window === "undefined") return;
+  const g = (window as unknown as { gtag?: Gtag }).gtag;
+  if (typeof g === "function") g("event", action, params);
+}
+
 export function PaymentButtons({
   companyId,
   termsVersion = "1.0",
+  priceDisplay,
+  priceCents,
 }: {
   companyId: string;
   termsVersion?: string;
+  priceDisplay?: string;
+  priceCents?: number;
 }) {
   const [agreed, setAgreed] = useState(false);
   const [showTermsError, setShowTermsError] = useState(false);
@@ -17,12 +33,23 @@ export function PaymentButtons({
   const [error, setError] = useState<string | null>(null);
 
   function requireAgreed() {
-    if (!agreed) { setShowTermsError(true); return false; }
+    if (!agreed) {
+      setShowTermsError(true);
+      track("terms_rejected", { company_id: companyId });
+      return false;
+    }
     return true;
   }
 
   async function handleStripe() {
+    track("pay_button_click", { method: "stripe", company_id: companyId });
     if (!requireAgreed()) return;
+    track("begin_checkout", {
+      currency: "USD",
+      value: typeof priceCents === "number" ? priceCents / 100 : undefined,
+      company_id: companyId,
+      method: "stripe",
+    });
     setLoading("stripe");
     setError(null);
     try {
@@ -49,7 +76,14 @@ export function PaymentButtons({
   }
 
   async function handlePayPal() {
+    track("pay_button_click", { method: "paypal", company_id: companyId });
     if (!requireAgreed()) return;
+    track("begin_checkout", {
+      currency: "USD",
+      value: typeof priceCents === "number" ? priceCents / 100 : undefined,
+      company_id: companyId,
+      method: "paypal",
+    });
     setLoading("paypal");
     setError(null);
     try {
@@ -75,21 +109,38 @@ export function PaymentButtons({
     }
   }
 
+  const ctaLabel =
+    loading === "stripe"
+      ? "Redirecting..."
+      : priceDisplay
+      ? `Get PDF Copy — $${priceDisplay}`
+      : "Get PDF Copy";
+
+  // Suppress unused-function warning while PayPal is hidden
+  void handlePayPal;
+
   return (
-    <div className="space-y-4">
-      {/* Mandatory consent checkbox */}
-      <div className={`bg-gray-50 rounded-lg p-4 border-2 transition-colors ${
-        showTermsError && !agreed ? "border-red-500" : "border-transparent"
-      }`}>
-        <label className="flex items-start gap-3 cursor-pointer">
+    <div id="pay-form" className="space-y-3">
+      {/* Mandatory consent checkbox — softened visually */}
+      <div
+        className={`rounded-lg px-3 py-2 border transition-colors ${
+          showTermsError && !agreed
+            ? "border-red-400 bg-red-50"
+            : "border-gray-200 bg-gray-50"
+        }`}
+      >
+        <label className="flex items-start gap-2 cursor-pointer">
           <input
             type="checkbox"
             checked={agreed}
-            onChange={(e) => { setAgreed(e.target.checked); if (e.target.checked) setShowTermsError(false); }}
-            className="mt-0.5 h-4 w-4 rounded border-gray-300 text-blue-600 flex-shrink-0"
+            onChange={(e) => {
+              setAgreed(e.target.checked);
+              if (e.target.checked) setShowTermsError(false);
+            }}
+            className="mt-0.5 h-4 w-4 rounded border-gray-300 text-green-600 flex-shrink-0"
           />
-          <span className="text-sm text-gray-700 leading-relaxed">
-            I have read and agree to the{" "}
+          <span className="text-xs text-gray-600 leading-relaxed">
+            I agree to the{" "}
             <Link
               href="/terms"
               target="_blank"
@@ -123,21 +174,31 @@ export function PaymentButtons({
       )}
 
       <Button
+        variant="success"
         onClick={handleStripe}
         disabled={loading !== null}
-        className="w-full !py-3 !text-base"
+        className="w-full !py-4 !text-base !font-bold shadow-sm"
       >
-        {loading === "stripe" ? "Redirecting..." : "Pay with Card (Stripe)"}
+        {ctaLabel}
       </Button>
 
       {/* PayPal hidden while account is under review */}
 
-      <p className="text-xs text-gray-400 text-center mt-2">
-        Secure payment processing. Your document will be available for
-        download immediately after payment.
+      <p className="text-xs text-gray-500 text-center">
+        Secure checkout · Instant download after payment
       </p>
 
-      <p className="text-xs text-gray-400 text-center">
+      <p className="text-xs text-center">
+        <Link
+          href="/faq"
+          target="_blank"
+          className="text-blue-600 hover:underline"
+        >
+          Questions? See our FAQ
+        </Link>
+      </p>
+
+      <p className="text-[11px] text-gray-400 text-center pt-1">
         CertExpress is a private service and is not affiliated with FMCSA or
         any government agency.
       </p>

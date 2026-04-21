@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { PaymentButtons } from "@/components/payment-buttons";
 import { PublicLayout } from "@/components/public-layout";
 import { PayPagePreview } from "@/components/pay-page-preview";
+import { StickyPayBar } from "@/components/sticky-pay-bar";
 
 export default async function PayPage({
   params,
@@ -20,11 +21,13 @@ export default async function PayPage({
 
   if (!company || !company.pdfFilename) return notFound();
 
-  const [priceCents, termsVersion, initialPriceRaw] = await Promise.all([
-    getPriceCents(),
-    getSetting("terms_version"),
-    getSetting("initial_price_cents"),
-  ]);
+  const [priceCents, termsVersion, initialPriceRaw, successfulOrderCount] =
+    await Promise.all([
+      getPriceCents(),
+      getSetting("terms_version"),
+      getSetting("initial_price_cents"),
+      prisma.order.count({ where: { status: "completed" } }),
+    ]);
   const priceDisplay = (priceCents / 100).toFixed(2);
   const initialPriceCents = initialPriceRaw ? parseInt(initialPriceRaw) : null;
   const initialPriceDisplay =
@@ -56,6 +59,12 @@ export default async function PayPage({
               <span>DOT: {company.usdotNumber}</span>
               <span>Date: {dateStr}</span>
             </div>
+            {successfulOrderCount >= 25 && (
+              <p className="mt-2 text-xs text-green-700">
+                <strong>{successfulOrderCount.toLocaleString()}</strong>{" "}
+                companies served
+              </p>
+            )}
           </div>
 
           <Card>
@@ -92,26 +101,62 @@ export default async function PayPage({
               </p>
             </div>
 
-            {/* Trust badges */}
-            <div className="flex flex-wrap justify-center gap-3 mb-4 text-xs text-gray-600">
-              <span className="flex items-center gap-1 bg-gray-100 px-3 py-1.5 rounded-full">
-                <span className="text-green-600 font-bold">&#10003;</span> Public FMCSA Record
-              </span>
-              <span className="flex items-center gap-1 bg-gray-100 px-3 py-1.5 rounded-full">
-                <span className="text-green-600 font-bold">&#10003;</span> Instant Delivery
-              </span>
-              <span className="flex items-center gap-1 bg-gray-100 px-3 py-1.5 rounded-full">
-                <span className="text-green-600 font-bold">&#10003;</span> Secure Payment
-              </span>
+            {/* Risk-reversal row — replaces old trust badges */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-5">
+              <div className="flex items-start gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5">
+                <span className="text-green-600 text-lg leading-none mt-0.5">
+                  &#9889;
+                </span>
+                <div>
+                  <div className="text-xs font-semibold text-gray-800">
+                    Instant delivery
+                  </div>
+                  <div className="text-[11px] text-gray-500 leading-snug">
+                    PDF ready to download right after payment
+                  </div>
+                </div>
+              </div>
+              <div className="flex items-start gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5">
+                <span className="text-green-600 text-lg leading-none mt-0.5">
+                  &#128274;
+                </span>
+                <div>
+                  <div className="text-xs font-semibold text-gray-800">
+                    Secure checkout via Stripe
+                  </div>
+                  <div className="text-[11px] text-gray-500 leading-snug">
+                    Your card details never touch our servers
+                  </div>
+                </div>
+              </div>
+              <Link
+                href="/refund"
+                target="_blank"
+                className="flex items-start gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5 hover:bg-gray-100 transition"
+              >
+                <span className="text-green-600 text-lg leading-none mt-0.5">
+                  &#128179;
+                </span>
+                <div>
+                  <div className="text-xs font-semibold text-gray-800">
+                    30-day money-back guarantee
+                  </div>
+                  <div className="text-[11px] text-gray-500 leading-snug">
+                    Not satisfied? Request a refund &mdash; see policy
+                  </div>
+                </div>
+              </Link>
             </div>
 
-            {/* Post-payment clarity */}
-            <p className="text-xs text-center text-gray-500 mb-5">
-              Download available immediately after payment
-            </p>
+            <PaymentButtons
+              companyId={company.id}
+              termsVersion={termsVersion || "1.0"}
+              priceDisplay={priceDisplay}
+              priceCents={priceCents}
+            />
 
-            {/* Document details (collapsed, secondary) */}
-            <details className="mb-5 border rounded-lg bg-gray-50">
+            {/* Document details (collapsed, now below CTA) */}
+            <details className="mt-5 border rounded-lg bg-gray-50">
               <summary className="px-4 py-3 text-sm font-medium text-gray-700 cursor-pointer">
                 Document Details
               </summary>
@@ -168,20 +213,16 @@ export default async function PayPage({
                 )}
               </div>
             </details>
-
-            <PaymentButtons
-              companyId={company.id}
-              termsVersion={termsVersion || "1.0"}
-            />
           </Card>
 
-          <div className="mt-4 text-center">
+          <div className="mt-4 text-center pb-24 md:pb-0">
             <Link href="/" className="text-sm text-blue-600 hover:underline">
               &larr; Back to search
             </Link>
           </div>
         </div>
       </main>
+      <StickyPayBar priceDisplay={priceDisplay} />
     </PublicLayout>
   );
 }
