@@ -111,7 +111,7 @@ export function ExcludedCompaniesTable({ rows }: { rows: Row[] }) {
                 <td className="py-2 pr-4">{r.email || "—"}</td>
                 <td className="py-2 pr-4 font-mono text-xs">{r.usdotNumber}</td>
                 <td className="py-2 pr-4">{r.documentType}</td>
-                <td className="py-2 pr-4">{new Date(r.serviceDate).toLocaleDateString()}</td>
+                <td className="py-2 pr-4">{new Date(r.serviceDate).toLocaleDateString("en-US", { timeZone: "UTC" })}</td>
                 <td className="py-2">{new Date(r.excludedAt).toLocaleString()}</td>
               </tr>
             ))}

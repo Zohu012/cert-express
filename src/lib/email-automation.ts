@@ -258,13 +258,15 @@ export async function fetchEligibleCompanies(opts: {
     orderBy: order,
   });
 
-  // Filter date range by the "YYYY-MM-DD" string that the UI renders for
-  // each serviceDate in the configured timezone. This avoids every pitfall
-  // of UTC-vs-zone boundary math: whatever the user sees in /admin/emails
-  // is exactly what the filter matches.
+  // serviceDate is a calendar date (e.g. a PDF's issue date), not an instant.
+  // PDF ingest stores it as UTC midnight of that date, so filter/display by
+  // the UTC date component to match what the UI shows on /admin/emails and
+  // the /admin dashboard. Using any local timezone here would shift the
+  // boundary and miss rows the user can clearly see in the list.
+  void timezone;
   const dateFmt = (serviceDateFrom || serviceDateTo)
     ? new Intl.DateTimeFormat("en-CA", {
-        timeZone: timezone,
+        timeZone: "UTC",
         year: "numeric",
         month: "2-digit",
         day: "2-digit",

@@ -147,7 +147,7 @@ export function EmailCampaignTable({ companies }: { companies: Company[] }) {
                 </td>
                 <td className="py-2 pr-4 font-medium">{c.companyName}</td>
                 <td className="py-2 pr-4 font-mono text-xs">{c.documentNumber}</td>
-                <td className="py-2 pr-4">{new Date(c.serviceDate).toLocaleDateString()}</td>
+                <td className="py-2 pr-4">{new Date(c.serviceDate).toLocaleDateString("en-US", { timeZone: "UTC" })}</td>
                 <td className="py-2">{c.email}</td>
               </tr>
             ))}
