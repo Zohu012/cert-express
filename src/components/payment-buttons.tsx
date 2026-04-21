@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import { STICKY_PAY_EVENT } from "@/components/sticky-pay-bar";
 
 type Gtag = (
   command: "event",
@@ -31,6 +32,7 @@ export function PaymentButtons({
   const [showTermsError, setShowTermsError] = useState(false);
   const [loading, setLoading] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const handleStripeRef = useRef<() => void>(() => {});
 
   function requireAgreed() {
     if (!agreed) {
@@ -118,6 +120,21 @@ export function PaymentButtons({
 
   // Suppress unused-function warning while PayPal is hidden
   void handlePayPal;
+
+  // Keep ref in sync so the global listener always calls the latest closure
+  handleStripeRef.current = handleStripe;
+
+  // Listen for the sticky mobile bar: it just fires this event; we run the
+  // same checkout logic (terms gate + Stripe redirect) here so there is one
+  // source of truth.
+  useEffect(() => {
+    const onStickyClick = () => {
+      track("sticky_pay_click", { company_id: companyId });
+      handleStripeRef.current();
+    };
+    window.addEventListener(STICKY_PAY_EVENT, onStickyClick);
+    return () => window.removeEventListener(STICKY_PAY_EVENT, onStickyClick);
+  }, [companyId]);
 
   return (
     <div id="pay-form" className="space-y-3">

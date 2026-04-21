@@ -2,6 +2,10 @@
 
 import { useEffect, useState } from "react";
 
+/** Shared event name — dispatched by the sticky bar, handled by PaymentButtons
+ *  so the sticky CTA reuses the exact same terms-check + Stripe redirect flow. */
+export const STICKY_PAY_EVENT = "certexpress:sticky-pay-click";
+
 export function StickyPayBar({ priceDisplay }: { priceDisplay: string }) {
   const [visible, setVisible] = useState(false);
 
@@ -11,6 +15,14 @@ export function StickyPayBar({ priceDisplay }: { priceDisplay: string }) {
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
+
+  function handleClick() {
+    // Scroll the pay form into view so the user can see the terms checkbox
+    // (or any error it throws), then fire the shared checkout event.
+    const form = document.getElementById("pay-form");
+    if (form) form.scrollIntoView({ behavior: "smooth", block: "center" });
+    window.dispatchEvent(new CustomEvent(STICKY_PAY_EVENT));
+  }
 
   if (!visible) return null;
 
@@ -24,12 +36,13 @@ export function StickyPayBar({ priceDisplay }: { priceDisplay: string }) {
           ${priceDisplay}
         </div>
       </div>
-      <a
-        href="#pay-form"
+      <button
+        type="button"
+        onClick={handleClick}
         className="flex-1 text-center bg-green-600 hover:bg-green-700 text-white font-bold py-3 rounded-lg shadow-sm"
       >
         Get PDF Copy
-      </a>
+      </button>
     </div>
   );
 }
