@@ -146,6 +146,54 @@ export function isWithinWindow(
   return hhmm >= config.startTime && hhmm <= config.endTime;
 }
 
+/**
+ * Convert a "YYYY-MM-DD" date string to the UTC instant that corresponds to
+ * midnight (or end-of-day) in the given IANA timezone. This is needed because
+ * serviceDate values are stored as UTC Date instants — a value stored as
+ * 2026-04-24T04:00:00.000Z shows up as "4/23/2026" when rendered in
+ * America/New_York via toLocaleDateString. Filtering with a naive
+ * new Date("2026-04-23") (= 2026-04-23T00:00:00Z) would miss it.
+ */
+function zonedDateToUtc(
+  dateStr: string,
+  timezone: string,
+  endOfDay: boolean,
+): Date {
+  const [y, m, d] = dateStr.split("-").map(Number);
+  const hour = endOfDay ? 23 : 0;
+  const minute = endOfDay ? 59 : 0;
+  const second = endOfDay ? 59 : 0;
+  const ms = endOfDay ? 999 : 0;
+
+  // Start with the literal moment interpreted as UTC.
+  const guess = new Date(Date.UTC(y, m - 1, d, hour, minute, second, ms));
+
+  // Read back the guess through the requested timezone.
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: timezone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+  }).formatToParts(guess);
+  const get = (type: string) =>
+    Number(parts.find((p) => p.type === type)?.value ?? 0);
+  const tzY = get("year");
+  const tzM = get("month");
+  const tzD = get("day");
+  let tzH = get("hour");
+  if (tzH === 24) tzH = 0;
+  const tzMin = get("minute");
+  const tzS = get("second");
+
+  const wantedMs = Date.UTC(y, m - 1, d, hour, minute, second, ms);
+  const gotMs = Date.UTC(tzY, tzM - 1, tzD, tzH, tzMin, tzS, ms);
+  return new Date(guess.getTime() + (wantedMs - gotMs));
+}
+
 /** Build a Prisma `where` clause covering all eligibility rules. */
 async function buildEligibilityWhere(config: AutomationConfig): Promise<Prisma.CompanyWhereInput> {
   const blocklist = await getUnsubscribeList();
@@ -166,13 +214,17 @@ async function buildEligibilityWhere(config: AutomationConfig): Promise<Prisma.C
 
   if (config.documentServiceDateFrom) {
     AND.push({
-      serviceDate: { gte: new Date(config.documentServiceDateFrom) },
+      serviceDate: {
+        gte: zonedDateToUtc(config.documentServiceDateFrom, config.timezone, false),
+      },
     });
   }
   if (config.documentServiceDateTo) {
-    const to = new Date(config.documentServiceDateTo);
-    to.setUTCHours(23, 59, 59, 999);
-    AND.push({ serviceDate: { lte: to } });
+    AND.push({
+      serviceDate: {
+        lte: zonedDateToUtc(config.documentServiceDateTo, config.timezone, true),
+      },
+    });
   }
 
   return { AND };
