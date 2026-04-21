@@ -245,12 +245,6 @@ export async function fetchEligibleCompanies(opts: {
     { email: { not: "" } },
     { excluded: { is: null } },
   ];
-  if (serviceDateFrom) {
-    AND.push({ serviceDate: { gte: zonedDateToUtc(serviceDateFrom, timezone, false) } });
-  }
-  if (serviceDateTo) {
-    AND.push({ serviceDate: { lte: zonedDateToUtc(serviceDateTo, timezone, true) } });
-  }
 
   const order: Prisma.CompanyOrderByWithRelationInput[] =
     orderBy === "newest"
@@ -264,6 +258,19 @@ export async function fetchEligibleCompanies(opts: {
     orderBy: order,
   });
 
+  // Filter date range by the "YYYY-MM-DD" string that the UI renders for
+  // each serviceDate in the configured timezone. This avoids every pitfall
+  // of UTC-vs-zone boundary math: whatever the user sees in /admin/emails
+  // is exactly what the filter matches.
+  const dateFmt = (serviceDateFrom || serviceDateTo)
+    ? new Intl.DateTimeFormat("en-CA", {
+        timeZone: timezone,
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+      })
+    : null;
+
   const blocklist = new Set(await getUnsubscribeList());
   const filtered: Company[] = [];
   for (const c of companies) {
@@ -272,6 +279,11 @@ export async function fetchEligibleCompanies(opts: {
     if (blocklist.has(c.email.toLowerCase().trim())) continue;
     const key = `${c.usdotNumber}:${c.email.toLowerCase().trim()}`;
     if (contactedSet.has(key)) continue;
+    if (dateFmt && c.serviceDate) {
+      const tzDate = dateFmt.format(c.serviceDate); // "2026-04-20"
+      if (serviceDateFrom && tzDate < serviceDateFrom) continue;
+      if (serviceDateTo && tzDate > serviceDateTo) continue;
+    }
     filtered.push(c);
     if (limit && filtered.length >= limit) break;
   }
