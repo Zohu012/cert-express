@@ -326,17 +326,17 @@ export default async function HomePage({
               <div className="space-y-4">
                 {[
                   {
-                    q: "Is CertExpress affiliated with the FMCSA?",
-                    a: "No. CertExpress is a private service. We assist you in accessing publicly available FMCSA documents — we are not affiliated with any government agency.",
+                    q: "Can I review my details before completing the download?",
+                    a: "Yes. You can view key document details and a preview before proceeding, so you can confirm it matches your company record."
                   },
                   {
                     q: "How quickly will I receive my document?",
-                    a: "Instantly. As soon as payment clears, the PDF is delivered on-screen and emailed to you.",
+                    a: "Instantly. Once your payment is successful, the PDF is available on-screen and sent to your email."
                   },
                   {
-                    q: "What if my carrier is not in your database?",
-                    a: "You receive a full refund. No document, no charge.",
-                  },
+                    q: "What if my company details are incorrect?",
+                    a: "If your company details are incorrect, you will receive a full refund. No document, no charge."
+                  }
                 ].map((item) => (
                   <div key={item.q} className="bg-white border border-gray-200 rounded-lg p-5">
                     <p className="font-semibold text-gray-900">{item.q}</p>
