@@ -194,64 +194,113 @@ function zonedDateToUtc(
   return new Date(guess.getTime() + (wantedMs - gotMs));
 }
 
-/** Build a Prisma `where` clause covering all eligibility rules. */
-async function buildEligibilityWhere(config: AutomationConfig): Promise<Prisma.CompanyWhereInput> {
-  const blocklist = await getUnsubscribeList();
+/**
+ * Single source of truth for "who is eligible to be emailed".
+ *
+ * Mirrors the exact filter used on /admin/emails (fetchCandidates in
+ * src/app/admin/emails/page.tsx): email present, not excluded, not
+ * unsubscribed, not on the blocklist, and no prior successful EmailLog row
+ * for the same (usdotNumber, email) pair. Optionally restricted to a
+ * service-date range interpreted in the given IANA timezone.
+ *
+ * `orderBy` controls result order:
+ *  - "newest"   : createdAt DESC (matches /admin/emails display order)
+ *  - "oldest"   : createdAt ASC  (FIFO)
+ *  - "serviceAsc": serviceDate ASC then createdAt ASC (used when a date
+ *                  range is active so the queue drains chronologically)
+ */
+export async function fetchEligibleCompanies(opts: {
+  serviceDateFrom?: string | null;
+  serviceDateTo?: string | null;
+  timezone?: string;
+  orderBy?: "newest" | "oldest" | "serviceAsc";
+  limit?: number;
+} = {}): Promise<Company[]> {
+  const {
+    serviceDateFrom,
+    serviceDateTo,
+    timezone = "America/New_York",
+    orderBy = "oldest",
+    limit,
+  } = opts;
 
-  // Companies already sent via successful EmailLog will have emailStatus = "sent"
-  // plus we filter NOT excluded, NOT unsubscribed, email present.
+  // Pairs (usdot:email) that have already been successfully contacted.
+  const sentLogs = await prisma.emailLog.findMany({
+    where: { company: { emailStatus: "sent" } },
+    select: {
+      toEmail: true,
+      company: { select: { usdotNumber: true } },
+    },
+  });
+  const contactedSet = new Set<string>();
+  for (const log of sentLogs) {
+    const dot = log.company?.usdotNumber;
+    if (dot && log.toEmail) {
+      contactedSet.add(`${dot}:${log.toEmail.toLowerCase().trim()}`);
+    }
+  }
+
   const AND: Prisma.CompanyWhereInput[] = [
     { email: { not: null } },
     { email: { not: "" } },
-    { emailStatus: { not: "sent" } },
-    { emailStatus: { not: "unsubscribed" } },
     { excluded: { is: null } },
   ];
-
-  if (blocklist.length > 0) {
-    AND.push({ email: { notIn: blocklist } });
+  if (serviceDateFrom) {
+    AND.push({ serviceDate: { gte: zonedDateToUtc(serviceDateFrom, timezone, false) } });
+  }
+  if (serviceDateTo) {
+    AND.push({ serviceDate: { lte: zonedDateToUtc(serviceDateTo, timezone, true) } });
   }
 
-  if (config.documentServiceDateFrom) {
-    AND.push({
-      serviceDate: {
-        gte: zonedDateToUtc(config.documentServiceDateFrom, config.timezone, false),
-      },
-    });
-  }
-  if (config.documentServiceDateTo) {
-    AND.push({
-      serviceDate: {
-        lte: zonedDateToUtc(config.documentServiceDateTo, config.timezone, true),
-      },
-    });
-  }
+  const order: Prisma.CompanyOrderByWithRelationInput[] =
+    orderBy === "newest"
+      ? [{ createdAt: "desc" }]
+      : orderBy === "serviceAsc"
+        ? [{ serviceDate: "asc" }, { createdAt: "asc" }]
+        : [{ createdAt: "asc" }];
 
-  return { AND };
-}
+  const companies = await prisma.company.findMany({
+    where: { AND },
+    orderBy: order,
+  });
 
-function pickOrderBy(config: AutomationConfig) {
-  const hasDateRange =
-    !!config.documentServiceDateFrom || !!config.documentServiceDateTo;
-  if (hasDateRange) {
-    return [{ serviceDate: "asc" as const }, { createdAt: "asc" as const }];
+  const blocklist = new Set(await getUnsubscribeList());
+  const filtered: Company[] = [];
+  for (const c of companies) {
+    if (!c.email || !c.usdotNumber) continue;
+    if (c.emailStatus === "unsubscribed") continue;
+    if (blocklist.has(c.email.toLowerCase().trim())) continue;
+    const key = `${c.usdotNumber}:${c.email.toLowerCase().trim()}`;
+    if (contactedSet.has(key)) continue;
+    filtered.push(c);
+    if (limit && filtered.length >= limit) break;
   }
-  return [{ createdAt: "asc" as const }];
+  return filtered;
 }
 
 export async function countEligibleCandidates(config: AutomationConfig): Promise<number> {
-  const where = await buildEligibilityWhere(config);
-  return prisma.company.count({ where });
+  const rows = await fetchEligibleCompanies({
+    serviceDateFrom: config.documentServiceDateFrom,
+    serviceDateTo: config.documentServiceDateTo,
+    timezone: config.timezone,
+    orderBy: "oldest",
+  });
+  return rows.length;
 }
 
 export async function getNextEligibleCandidate(
   config: AutomationConfig
 ): Promise<Company | null> {
-  const where = await buildEligibilityWhere(config);
-  return prisma.company.findFirst({
-    where,
-    orderBy: pickOrderBy(config),
+  const hasDateRange =
+    !!config.documentServiceDateFrom || !!config.documentServiceDateTo;
+  const rows = await fetchEligibleCompanies({
+    serviceDateFrom: config.documentServiceDateFrom,
+    serviceDateTo: config.documentServiceDateTo,
+    timezone: config.timezone,
+    orderBy: hasDateRange ? "serviceAsc" : "oldest",
+    limit: 1,
   });
+  return rows[0] ?? null;
 }
 
 export function randomDelayMs(config: AutomationConfig): number {

@@ -3,8 +3,7 @@ import { Card } from "@/components/ui/card";
 import { EmailCampaignTable } from "@/components/email-campaign-table";
 import { verifySession } from "@/lib/auth";
 import { redirect } from "next/navigation";
-import { prisma } from "@/lib/db";
-import { getUnsubscribeList } from "@/lib/unsubscribe-list";
+import { fetchEligibleCompanies } from "@/lib/email-automation";
 
 export const dynamic = "force-dynamic";
 
@@ -22,56 +21,7 @@ async function fetchCandidates(
   page: number
 ): Promise<{ companies: Company[]; total: number; totalPages: number }> {
   const perPage = 50;
-
-  // Build set of (usdotNumber + email) pairs that have been SUCCESSFULLY contacted
-  // (EmailLog row AND Company.emailStatus = "sent").
-  const sentLogs = await prisma.emailLog.findMany({
-    where: { company: { emailStatus: "sent" } },
-    select: {
-      toEmail: true,
-      company: { select: { usdotNumber: true } },
-    },
-  });
-
-  const contactedSet = new Set<string>();
-  for (const log of sentLogs) {
-    const dot = log.company?.usdotNumber;
-    if (dot && log.toEmail) {
-      contactedSet.add(`${dot}:${log.toEmail.toLowerCase().trim()}`);
-    }
-  }
-
-  // All companies with a non-empty email, excluding companies on the exclusion list
-  const companiesWithEmail = await prisma.company.findMany({
-    where: {
-      AND: [
-        { email: { not: null } },
-        { email: { not: "" } },
-        { excluded: { is: null } },
-      ],
-    },
-    select: {
-      id: true,
-      companyName: true,
-      documentNumber: true,
-      documentType: true,
-      email: true,
-      emailStatus: true,
-      serviceDate: true,
-      usdotNumber: true,
-    },
-    orderBy: { createdAt: "desc" },
-  });
-
-  const blocklist = new Set(await getUnsubscribeList()); // lowercased
-
-  const candidates = companiesWithEmail.filter((c) => {
-    if (!c.email || !c.usdotNumber) return false;
-    if (c.emailStatus === "unsubscribed") return false;
-    if (blocklist.has(c.email.toLowerCase().trim())) return false;
-    const key = `${c.usdotNumber}:${c.email.toLowerCase().trim()}`;
-    return !contactedSet.has(key);
-  });
+  const candidates = await fetchEligibleCompanies({ orderBy: "newest" });
 
   const total = candidates.length;
   const paged = candidates.slice((page - 1) * perPage, page * perPage);
