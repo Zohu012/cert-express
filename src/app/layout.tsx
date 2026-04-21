@@ -4,22 +4,53 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://www.certexpresss.com"),
-  title: "CertExpress - FMCSA Certificate Delivery",
+  title: {
+    default: "CertExpress — FMCSA Certificate of Authority Delivery",
+    template: "%s | CertExpress",
+  },
   description:
-    "Get your FMCSA Certificate of Authority delivered instantly. Search by USDOT Number, MC/MX Number, or Company Name.",
+    "Get your FMCSA Certificate of Authority delivered instantly. Search by USDOT Number, MC/MX Number, or Company Name. Secure payment, instant PDF download.",
+  keywords: [
+    "FMCSA certificate of authority",
+    "USDOT certificate",
+    "MC number certificate",
+    "trucking authority document",
+    "DOT number lookup",
+    "motor carrier certificate",
+    "FMCSA document download",
+    "CertExpress",
+  ],
   icons: {
-    icon: [
-      { url: "/logo_icon.png", type: "image/png", sizes: "any" },
-    ],
+    icon: [{ url: "/logo_icon.png", type: "image/png", sizes: "any" }],
     shortcut: [{ url: "/logo_icon.png", type: "image/png" }],
     apple: [{ url: "/logo_icon.png", type: "image/png", sizes: "180x180" }],
   },
   openGraph: {
-    title: "CertExpress - FMCSA Certificate Delivery",
+    title: "CertExpress — FMCSA Certificate of Authority Delivery",
     description:
-      "Get your FMCSA Certificate of Authority delivered instantly.",
+      "Instant, secure delivery of FMCSA Certificates of Authority. Search by USDOT, MC/MX, or carrier name.",
     images: ["/logo_icon.png"],
+    siteName: "CertExpress",
     type: "website",
+    locale: "en_US",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "CertExpress — FMCSA Certificate of Authority Delivery",
+    description:
+      "Instant, secure delivery of FMCSA Certificates of Authority.",
+    images: ["/logo_icon.png"],
+  },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      "max-snippet": -1,
+      "max-image-preview": "large",
+      "max-video-preview": -1,
+    },
   },
 };
 

@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { getPriceCents } from "@/lib/settings";
 import { Button } from "@/components/ui/button";
@@ -43,19 +44,44 @@ export default async function HomePage({
     }
   }
 
+  // Landing-page stats (only queried when not showing search results, so
+  // search remains snappy and stats don't run a query per search submit).
+  let stats: { companies: number; states: number; delivered: number } | null = null;
+  if (!searched) {
+    const [companiesCount, statesRows, deliveredCount] = await Promise.all([
+      prisma.company.count(),
+      prisma.company.findMany({
+        where: { state: { not: null } },
+        distinct: ["state"],
+        select: { state: true },
+      }),
+      prisma.order.count({ where: { status: "completed" } }),
+    ]);
+    stats = {
+      companies: companiesCount,
+      states: statesRows.length,
+      delivered: deliveredCount,
+    };
+  }
+
   return (
     <PublicLayout>
       {/* Hero + Search */}
-      <div className="bg-blue-800 text-white py-12">
+      <section
+        id="search"
+        className="bg-gradient-to-br from-blue-900 via-blue-800 to-blue-700 text-white py-16"
+      >
         <div className="max-w-3xl mx-auto px-4 text-center">
-          <h1 className="text-3xl font-bold mb-3">
-            FMCSA Certificate of Authority Lookup
+          <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold tracking-tight mb-4">
+            Your FMCSA Certificate of Authority,
+            <span className="block text-green-300 mt-2">delivered in minutes.</span>
           </h1>
-          <p className="text-blue-200 mb-8">
-            Search by USDOT Number, MC/MX Number or Company Name
+          <p className="text-blue-100 text-base sm:text-lg mb-8 max-w-2xl mx-auto">
+            Search by USDOT Number, MC/MX Number, or Company Name. Secure payment.
+            Instant download.
           </p>
 
-          <Card className="text-left !bg-blue-50 !border-blue-200">
+          <Card className="text-left !bg-white !border-blue-200 !shadow-xl">
             <form action="/" method="GET">
               <div className="flex flex-wrap gap-4 mb-4">
                 {[
@@ -91,83 +117,114 @@ export default async function HomePage({
               </div>
             </form>
           </Card>
+
+          <p className="mt-4 text-sm text-blue-200">
+            Or{" "}
+            <Link href="/companies" className="underline hover:text-white">
+              browse all carriers
+            </Link>{" "}
+            in our public directory.
+          </p>
         </div>
-      </div>
+      </section>
 
-      {/* Results */}
-      <div className="max-w-5xl mx-auto px-4 py-8">
-        {searched && companies.length === 0 && (
-          <div className="text-center py-12 text-gray-500">
-            <p className="text-lg">No results found for &quot;{query}&quot;</p>
-            <p className="text-sm mt-1">Try a different search term.</p>
-          </div>
-        )}
+      {/* Results block — unchanged behavior */}
+      {searched && (
+        <div className="max-w-5xl mx-auto px-4 py-8">
+          {companies.length === 0 && (
+            <div className="text-center py-12 text-gray-500">
+              <p className="text-lg">No results found for &quot;{query}&quot;</p>
+              <p className="text-sm mt-1">Try a different search term.</p>
+            </div>
+          )}
 
-        {companies.length > 0 && (
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <p className="text-sm text-gray-500">
-                  {companies.length} result{companies.length !== 1 ? "s" : ""}{" "}
-                  found
+          {companies.length > 0 && (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <p className="text-sm text-gray-500">
+                    {companies.length} result{companies.length !== 1 ? "s" : ""}{" "}
+                    found
+                  </p>
+                  {companies.length === 1 && (
+                    <span className="text-xs font-medium bg-green-100 text-green-700 px-2 py-0.5 rounded-full">
+                      Match Found
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {companies.map((company) => {
+                const d = new Date(company.serviceDate);
+                const dateStr = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}-${String(d.getUTCDate()).padStart(2, "0")}`;
+                return (
+                  <SearchResultCard
+                    key={company.id}
+                    company={{
+                      id: company.id,
+                      companyName: company.companyName,
+                      dbaName: company.dbaName,
+                      usdotNumber: company.usdotNumber,
+                      documentNumber: company.documentNumber,
+                      documentType: company.documentType,
+                      serviceDate: dateStr,
+                      city: company.city,
+                      state: company.state,
+                      previewFilename: company.previewFilename,
+                    }}
+                    priceDisplay={priceDisplay}
+                  />
+                );
+              })}
+
+              <div className="text-center pt-3 space-y-1">
+                <p className="text-xs text-gray-500">
+                  Most carriers use this for onboarding and broker setup
                 </p>
-                {companies.length === 1 && (
-                  <span className="text-xs font-medium bg-green-100 text-green-700 px-2 py-0.5 rounded-full">
-                    Match Found
-                  </span>
-                )}
+                <p className="text-xs text-gray-400">
+                  Private service — not affiliated with FMCSA or U.S. Department
+                  of Transportation
+                </p>
               </div>
             </div>
+          )}
+        </div>
+      )}
 
-            {companies.map((company) => {
-              const d = new Date(company.serviceDate);
-              const dateStr = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}-${String(d.getUTCDate()).padStart(2, "0")}`;
-              return (
-                <SearchResultCard
-                  key={company.id}
-                  company={{
-                    id: company.id,
-                    companyName: company.companyName,
-                    dbaName: company.dbaName,
-                    usdotNumber: company.usdotNumber,
-                    documentNumber: company.documentNumber,
-                    documentType: company.documentType,
-                    serviceDate: dateStr,
-                    city: company.city,
-                    state: company.state,
-                    previewFilename: company.previewFilename,
-                  }}
-                  priceDisplay={priceDisplay}
-                />
-              );
-            })}
-
-            {/* Trust messaging + disclaimer */}
-            <div className="text-center pt-3 space-y-1">
-              <p className="text-xs text-gray-500">
-                Most carriers use this for onboarding and broker setup
-              </p>
-              <p className="text-xs text-gray-400">
-                Private service — not affiliated with FMCSA or U.S. Department
-                of Transportation
-              </p>
+      {!searched && (
+        <>
+          {/* Trust strip */}
+          <section className="border-b border-gray-200 bg-white">
+            <div className="max-w-6xl mx-auto px-4 py-6 grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
+              {[
+                { title: "Instant Delivery", desc: "PDF emailed the moment payment clears" },
+                { title: "Official Documents", desc: "Sourced from public FMCSA filings" },
+                { title: "Secure Payments", desc: "Stripe & PayPal — your card is never stored" },
+                { title: "24/7 Access", desc: "Search, pay, and download any time" },
+              ].map((t) => (
+                <div key={t.title} className="px-2">
+                  <p className="text-sm font-semibold text-gray-900">{t.title}</p>
+                  <p className="text-xs text-gray-500 mt-1">{t.desc}</p>
+                </div>
+              ))}
             </div>
-          </div>
-        )}
+          </section>
 
-        {!searched && (
-          <div>
-            {/* "How It Works" section */}
-            <div className="max-w-3xl mx-auto">
-              <h2 className="text-xl font-semibold text-gray-800 text-center mb-6">
+          {/* How It Works */}
+          <section className="py-14 bg-gray-50">
+            <div className="max-w-5xl mx-auto px-4">
+              <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 text-center mb-3">
                 How It Works
               </h2>
-              <div className="grid gap-4 sm:grid-cols-3 mb-10">
+              <p className="text-center text-gray-600 mb-10">
+                Three steps from search to signed PDF.
+              </p>
+              <div className="grid gap-5 sm:grid-cols-3">
                 {[
                   {
                     step: "1",
                     title: "Search",
-                    desc: "Enter your USDOT or MC/MX number to find your FMCSA document in our daily-updated database.",
+                    desc: "Enter a USDOT, MC/MX, or company name to locate the FMCSA record.",
                   },
                   {
                     step: "2",
@@ -177,50 +234,143 @@ export default async function HomePage({
                   {
                     step: "3",
                     title: "Download",
-                    desc: "Receive your document instantly — download from the page or via your confirmation email.",
+                    desc: "Get the PDF instantly, plus a copy emailed for your records.",
                   },
                 ].map((item) => (
                   <div
                     key={item.step}
-                    className="bg-gray-50 border border-gray-200 rounded-lg p-5 text-center"
+                    className="bg-white border border-gray-200 rounded-xl p-6 text-center shadow-sm hover:shadow-md transition"
                   >
-                    <div className="w-10 h-10 rounded-full bg-blue-600 text-white flex items-center justify-center text-lg font-bold mx-auto mb-3">
+                    <div className="w-12 h-12 rounded-full bg-blue-600 text-white flex items-center justify-center text-xl font-bold mx-auto mb-4 shadow">
                       {item.step}
                     </div>
-                    <h3 className="font-semibold text-gray-900 mb-1">
+                    <h3 className="font-semibold text-gray-900 text-lg mb-2">
                       {item.title}
                     </h3>
-                    <p className="text-sm text-gray-600">{item.desc}</p>
+                    <p className="text-sm text-gray-600 leading-relaxed">{item.desc}</p>
                   </div>
                 ))}
               </div>
+            </div>
+          </section>
 
-              <div className="text-center text-gray-400">
-                <svg
-                  className="mx-auto h-12 w-12 mb-3"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={1.5}
-                    d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-                  />
-                </svg>
-                <p className="text-base">
-                  Search for a company to get a copy of their FMCSA document
-                </p>
-                <p className="text-xs mt-1">
-                  CertExpress is a private service — not affiliated with FMCSA
-                  or any government agency
-                </p>
+          {/* Why CertExpress */}
+          <section className="py-14 bg-white">
+            <div className="max-w-5xl mx-auto px-4">
+              <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 text-center mb-10">
+                Why carriers choose CertExpress
+              </h2>
+              <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+                {[
+                  {
+                    title: "No FMCSA trip required",
+                    desc: "Skip the office visit — your certificate arrives by email.",
+                  },
+                  {
+                    title: "Searchable archive",
+                    desc: "Daily-updated index of certificates, permits, and licenses.",
+                  },
+                  {
+                    title: "Broker-ready PDF",
+                    desc: "Clean, official-format document suited for onboarding packets.",
+                  },
+                  {
+                    title: "Refund guarantee",
+                    desc: "If we can't deliver your document, you don't pay. Simple.",
+                  },
+                ].map((f) => (
+                  <div
+                    key={f.title}
+                    className="rounded-xl border border-gray-200 p-5 hover:border-blue-300 hover:shadow-sm transition"
+                  >
+                    <h3 className="font-semibold text-gray-900 mb-2">{f.title}</h3>
+                    <p className="text-sm text-gray-600 leading-relaxed">{f.desc}</p>
+                  </div>
+                ))}
               </div>
             </div>
-          </div>
-        )}
-      </div>
+          </section>
+
+          {/* Stats band */}
+          {stats && (
+            <section className="py-12 bg-blue-900 text-white">
+              <div className="max-w-5xl mx-auto px-4 grid grid-cols-1 sm:grid-cols-3 gap-8 text-center">
+                <div>
+                  <p className="text-3xl sm:text-4xl font-bold text-green-300">
+                    {stats.companies.toLocaleString()}
+                  </p>
+                  <p className="mt-1 text-sm text-blue-200">FMCSA records indexed</p>
+                </div>
+                <div>
+                  <p className="text-3xl sm:text-4xl font-bold text-green-300">
+                    {stats.states}
+                  </p>
+                  <p className="mt-1 text-sm text-blue-200">U.S. states covered</p>
+                </div>
+                <div>
+                  <p className="text-3xl sm:text-4xl font-bold text-green-300">
+                    {stats.delivered.toLocaleString()}
+                  </p>
+                  <p className="mt-1 text-sm text-blue-200">Documents delivered</p>
+                </div>
+              </div>
+            </section>
+          )}
+
+          {/* FAQ teaser */}
+          <section className="py-14 bg-gray-50">
+            <div className="max-w-3xl mx-auto px-4">
+              <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 text-center mb-8">
+                Frequently asked
+              </h2>
+              <div className="space-y-4">
+                {[
+                  {
+                    q: "Is CertExpress affiliated with the FMCSA?",
+                    a: "No. CertExpress is a private service. We assist you in accessing publicly available FMCSA documents — we are not affiliated with any government agency.",
+                  },
+                  {
+                    q: "How quickly will I receive my document?",
+                    a: "Instantly. As soon as payment clears, the PDF is delivered on-screen and emailed to you.",
+                  },
+                  {
+                    q: "What if my carrier is not in your database?",
+                    a: "You receive a full refund. No document, no charge.",
+                  },
+                ].map((item) => (
+                  <div key={item.q} className="bg-white border border-gray-200 rounded-lg p-5">
+                    <p className="font-semibold text-gray-900">{item.q}</p>
+                    <p className="mt-2 text-sm text-gray-600 leading-relaxed">{item.a}</p>
+                  </div>
+                ))}
+              </div>
+              <p className="text-center mt-6">
+                <Link href="/faq" className="text-sm font-medium text-blue-700 hover:underline">
+                  See all FAQs →
+                </Link>
+              </p>
+            </div>
+          </section>
+
+          {/* CTA band */}
+          <section className="py-12 bg-white border-t border-gray-200">
+            <div className="max-w-4xl mx-auto px-4 text-center">
+              <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-3">
+                Need a carrier&apos;s Certificate of Authority?
+              </h2>
+              <p className="text-gray-600 mb-6">
+                Search our database by USDOT, MC/MX, or company name and download in minutes.
+              </p>
+              <Link
+                href="/#search"
+                className="inline-flex items-center rounded-lg bg-green-600 px-6 py-3 text-base font-semibold text-white shadow-sm hover:bg-green-700 transition"
+              >
+                Start a search
+              </Link>
+            </div>
+          </section>
+        </>
+      )}
     </PublicLayout>
   );
 }
