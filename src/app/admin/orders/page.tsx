@@ -3,6 +3,14 @@ import { verifySession } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { Card } from "@/components/ui/card";
 import { OrderTable } from "@/components/order-table";
+import type { Prisma } from "@prisma/client";
+import { OrderRateChart, type DailyOrderStat } from "@/components/order-rate-chart";
+
+function endOfDay(dateStr: string): Date {
+  const d = new Date(dateStr);
+  d.setDate(d.getDate() + 1);
+  return d;
+}
 
 export default async function OrdersPage({
   searchParams,
@@ -12,6 +20,8 @@ export default async function OrdersPage({
     q?: string;
     status?: string;
     method?: string;
+    dateFrom?: string;
+    dateTo?: string;
   }>;
 }) {
   const adminId = await verifySession();
@@ -22,10 +32,12 @@ export default async function OrdersPage({
   const query = params.q || "";
   const statusFilter = params.status || "";
   const methodFilter = params.method || "";
+  const dateFrom = params.dateFrom || "";
+  const dateTo = params.dateTo || "";
   const perPage = 50;
 
   // Build where clause
-  const where: Record<string, unknown> = {};
+  const where: Prisma.OrderWhereInput = {};
   if (statusFilter) where.status = statusFilter;
   if (methodFilter) where.paymentMethod = methodFilter;
   if (query) {
@@ -35,6 +47,12 @@ export default async function OrdersPage({
       { company: { companyName: { contains: query } } },
       { company: { usdotNumber: { contains: query } } },
     ];
+  }
+  if (dateFrom || dateTo) {
+    const createdAt: Prisma.DateTimeFilter = {};
+    if (dateFrom) createdAt.gte = new Date(dateFrom);
+    if (dateTo) createdAt.lt = endOfDay(dateTo);
+    where.createdAt = createdAt;
   }
 
   const [orders, total, stats] = await Promise.all([
@@ -73,11 +91,101 @@ export default async function OrdersPage({
   const revenue = (revenueAgg._sum.amount || 0) / 100;
   const totalPages = Math.ceil(total / perPage);
 
+  // ── Look up the latest email sent per USDOT # for the orders in view ──
+  const usdotNumbers = Array.from(
+    new Set(orders.map((o) => o.company.usdotNumber))
+  );
+  const emailLogsForUsdots = usdotNumbers.length
+    ? await prisma.emailLog.findMany({
+        where: {
+          company: { usdotNumber: { in: usdotNumbers } },
+        },
+        select: {
+          sentAt: true,
+          company: { select: { usdotNumber: true } },
+        },
+        orderBy: { sentAt: "desc" },
+      })
+    : [];
+
+  const latestEmailByUsdot = new Map<string, Date>();
+  for (const log of emailLogsForUsdots) {
+    const key = log.company.usdotNumber;
+    if (!latestEmailByUsdot.has(key)) {
+      latestEmailByUsdot.set(key, log.sentAt);
+    }
+  }
+
+  const ordersWithEmail = orders.map((o) => ({
+    ...o,
+    emailSentAt: latestEmailByUsdot.get(o.company.usdotNumber) ?? null,
+  }));
+
+  // ── Per-day order/revenue stats for trailing 30 days ──
+  const dailyStats: DailyOrderStat[] = await (async () => {
+    const DAYS = 30;
+    const now = new Date();
+    const todayMidnight = new Date(
+      now.getFullYear(),
+      now.getMonth(),
+      now.getDate()
+    );
+    const start = new Date(todayMidnight);
+    start.setDate(start.getDate() - (DAYS - 1));
+    const end = new Date(todayMidnight);
+    end.setDate(end.getDate() + 1);
+
+    const keys: string[] = [];
+    for (let i = 0; i < DAYS; i++) {
+      const d = new Date(start);
+      d.setDate(start.getDate() + i);
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, "0");
+      const dd = String(d.getDate()).padStart(2, "0");
+      keys.push(`${y}-${m}-${dd}`);
+    }
+
+    function dayKey(d: Date) {
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, "0");
+      const dd = String(d.getDate()).padStart(2, "0");
+      return `${y}-${m}-${dd}`;
+    }
+
+    const rows = await prisma.order.findMany({
+      where: { createdAt: { gte: start, lt: end } },
+      select: { createdAt: true, amount: true, status: true },
+    });
+
+    const orderCount = new Map<string, number>();
+    const revenueByDay = new Map<string, number>();
+    for (const k of keys) {
+      orderCount.set(k, 0);
+      revenueByDay.set(k, 0);
+    }
+    for (const r of rows) {
+      const k = dayKey(r.createdAt);
+      if (!orderCount.has(k)) continue;
+      orderCount.set(k, (orderCount.get(k) ?? 0) + 1);
+      if (r.status === "completed") {
+        revenueByDay.set(k, (revenueByDay.get(k) ?? 0) + r.amount);
+      }
+    }
+
+    return keys.map((k) => ({
+      date: k,
+      orders: orderCount.get(k) ?? 0,
+      revenueCents: revenueByDay.get(k) ?? 0,
+    }));
+  })();
+
   function buildQuery(overrides: Record<string, string | number>) {
     const base: Record<string, string> = {};
     if (query) base.q = query;
     if (statusFilter) base.status = statusFilter;
     if (methodFilter) base.method = methodFilter;
+    if (dateFrom) base.dateFrom = dateFrom;
+    if (dateTo) base.dateTo = dateTo;
     const merged = { ...base, ...overrides };
     return (
       "?" +
@@ -87,6 +195,9 @@ export default async function OrdersPage({
         .join("&")
     );
   }
+
+  const hasFilters =
+    query || statusFilter || methodFilter || dateFrom || dateTo;
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-8">
@@ -105,12 +216,15 @@ export default async function OrdersPage({
         />
       </div>
 
+      {/* Orders trend chart */}
+      <OrderRateChart data={dailyStats} />
+
       {/* Filters */}
       <Card className="mb-4">
         <form
           action="/admin/orders"
           method="GET"
-          className="flex flex-wrap gap-3"
+          className="flex flex-wrap gap-3 items-center"
         >
           <input
             type="text"
@@ -119,6 +233,24 @@ export default async function OrdersPage({
             placeholder="Search email, company, payment ID…"
             className="flex-1 min-w-[200px] rounded-lg border border-gray-300 px-3 py-2 text-sm"
           />
+          <div className="flex items-center gap-1">
+            <label className="text-xs text-gray-500 whitespace-nowrap">From</label>
+            <input
+              type="date"
+              name="dateFrom"
+              defaultValue={dateFrom}
+              className="rounded-lg border border-gray-300 px-3 py-2 text-sm"
+            />
+          </div>
+          <div className="flex items-center gap-1">
+            <label className="text-xs text-gray-500 whitespace-nowrap">To</label>
+            <input
+              type="date"
+              name="dateTo"
+              defaultValue={dateTo}
+              className="rounded-lg border border-gray-300 px-3 py-2 text-sm"
+            />
+          </div>
           <select
             name="status"
             defaultValue={statusFilter}
@@ -145,7 +277,7 @@ export default async function OrdersPage({
           >
             Filter
           </button>
-          {(query || statusFilter || methodFilter) && (
+          {hasFilters && (
             <a
               href="/admin/orders"
               className="rounded-lg border border-gray-300 px-4 py-2 text-sm hover:bg-gray-50"
@@ -161,10 +293,12 @@ export default async function OrdersPage({
         Showing {orders.length} of {total} order{total !== 1 ? "s" : ""}
         {statusFilter && ` · status: ${statusFilter}`}
         {methodFilter && ` · method: ${methodFilter}`}
+        {(dateFrom || dateTo) &&
+          ` · ${dateFrom || "start"} → ${dateTo || "today"}`}
         {query && ` · "${query}"`}
       </p>
 
-      <OrderTable orders={orders} />
+      <OrderTable orders={ordersWithEmail} />
 
       {/* Pagination */}
       {totalPages > 1 && (
@@ -211,7 +345,6 @@ function StatCard({
   label,
   value,
   color,
-  isText,
 }: {
   label: string;
   value: string | number;

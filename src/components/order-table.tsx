@@ -15,6 +15,7 @@ interface OrderRow {
   downloadToken: string;
   expiresAt: Date;
   createdAt: Date;
+  emailSentAt: Date | null;
   company: {
     id: string;
     companyName: string;
@@ -146,6 +147,7 @@ export function OrderTable({ orders }: { orders: OrderRow[] }) {
               <th className="px-4 py-3">Date</th>
               <th className="px-4 py-3">Company</th>
               <th className="px-4 py-3">DOT #</th>
+              <th className="px-4 py-3">Email Sent</th>
               <th className="px-4 py-3">Doc Date</th>
               <th className="px-4 py-3">PDF</th>
               <th className="px-4 py-3">Buyer Email</th>
@@ -160,7 +162,7 @@ export function OrderTable({ orders }: { orders: OrderRow[] }) {
           <tbody>
             {rows.length === 0 && (
               <tr>
-                <td colSpan={12} className="text-center py-10 text-gray-400">
+                <td colSpan={13} className="text-center py-10 text-gray-400">
                   No orders found
                 </td>
               </tr>
@@ -176,6 +178,13 @@ export function OrderTable({ orders }: { orders: OrderRow[] }) {
                   </span>
                 </td>
                 <td className="px-4 py-2 text-gray-600">{order.company.usdotNumber}</td>
+                <td className="px-4 py-2 text-gray-600 whitespace-nowrap text-xs">
+                  {order.emailSentAt ? (
+                    fmtDateTime(order.emailSentAt)
+                  ) : (
+                    <span className="text-gray-400 italic">—</span>
+                  )}
+                </td>
                 <td className="px-4 py-2 text-gray-600 whitespace-nowrap">
                   {fmtDate(order.company.serviceDate)}
                 </td>
