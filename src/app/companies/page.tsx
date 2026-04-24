@@ -48,8 +48,23 @@ export default async function CompaniesIndex({
     return qs ? `/companies?${qs}` : "/companies";
   }
 
+  const baseUrl = "https://www.certexpresss.com";
+  function absPageUrl(p: number) {
+    const params = new URLSearchParams();
+    if (q) params.set("q", q);
+    if (p > 1) params.set("page", String(p));
+    const qs = params.toString();
+    return qs ? `${baseUrl}/companies?${qs}` : `${baseUrl}/companies`;
+  }
+
   return (
     <PublicLayout>
+      {pageNum > 1 && (
+        <link rel="prev" href={absPageUrl(pageNum - 1)} />
+      )}
+      {pageNum < totalPages && (
+        <link rel="next" href={absPageUrl(pageNum + 1)} />
+      )}
       <section className="bg-gradient-to-br from-blue-900 to-blue-700 text-white py-12">
         <div className="max-w-5xl mx-auto px-4">
           <h1 className="text-3xl sm:text-4xl font-bold tracking-tight">

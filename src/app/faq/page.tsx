@@ -2,6 +2,7 @@ import { PublicLayout } from "@/components/public-layout";
 
 export const metadata = {
   title: "FAQ | CertExpress",
+  alternates: { canonical: "/faq" },
 };
 
 const faqs = [
@@ -44,8 +45,25 @@ const faqs = [
 ];
 
 export default function FaqPage() {
+  const faqJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    mainEntity: faqs.map((f) => ({
+      "@type": "Question",
+      name: f.q,
+      acceptedAnswer: {
+        "@type": "Answer",
+        text: f.a,
+      },
+    })),
+  };
+
   return (
     <PublicLayout>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd) }}
+      />
       <div className="max-w-3xl mx-auto px-4 py-12">
         <h1 className="text-3xl font-bold mb-2">Frequently Asked Questions</h1>
         <p className="text-gray-500 mb-8">

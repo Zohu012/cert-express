@@ -54,6 +54,35 @@ export const metadata: Metadata = {
   },
 };
 
+const siteJsonLd = [
+  {
+    "@context": "https://schema.org",
+    "@type": "Organization",
+    name: "CertExpress",
+    url: "https://www.certexpresss.com",
+    logo: "https://www.certexpresss.com/logo.png",
+    description:
+      "Private document-retrieval service that delivers FMCSA Certificates of Authority, Permits, and Licenses as instant PDF downloads.",
+    email: "orders@certexpresss.com",
+    sameAs: [] as string[],
+  },
+  {
+    "@context": "https://schema.org",
+    "@type": "WebSite",
+    name: "CertExpress",
+    url: "https://www.certexpresss.com",
+    potentialAction: {
+      "@type": "SearchAction",
+      target: {
+        "@type": "EntryPoint",
+        urlTemplate:
+          "https://www.certexpresss.com/?type=dot&q={search_term_string}",
+      },
+      "query-input": "required name=search_term_string",
+    },
+  },
+];
+
 export default function RootLayout({
   children,
 }: {
@@ -62,6 +91,14 @@ export default function RootLayout({
   return (
     <html lang="en" className="h-full antialiased">
       <head>
+        <link rel="preconnect" href="https://www.googletagmanager.com" />
+        <link rel="preconnect" href="https://www.google-analytics.com" />
+        <link rel="dns-prefetch" href="https://www.googletagmanager.com" />
+        <link rel="dns-prefetch" href="https://www.google-analytics.com" />
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(siteJsonLd) }}
+        />
         <Script
           src="https://www.googletagmanager.com/gtag/js?id=G-X8TYG1H11N"
           strategy="afterInteractive"

@@ -3,6 +3,7 @@ import Link from "next/link";
 
 export const metadata = {
   title: "Refund Policy | CertExpress",
+  alternates: { canonical: "/refund" },
 };
 
 export default function RefundPage() {
@@ -93,6 +94,19 @@ export default function RefundPage() {
               .
             </p>
           </div>
+
+          <section className="text-sm text-gray-600 leading-relaxed">
+            <h2 className="text-base font-semibold text-gray-900 mb-2">
+              About CertExpress
+            </h2>
+            <p>
+              CertExpress is a private FMCSA document-retrieval service that
+              delivers Certificates of Authority, operating permits, and motor
+              carrier licenses as instant PDF downloads. Our refund policy is
+              built around one rule: if we could not deliver a usable document,
+              you do not pay.
+            </p>
+          </section>
         </div>
       </div>
     </PublicLayout>

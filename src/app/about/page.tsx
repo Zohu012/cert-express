@@ -2,6 +2,7 @@ import { PublicLayout } from "@/components/public-layout";
 
 export const metadata = {
   title: "About CertExpress | FMCSA Document Delivery Service",
+  alternates: { canonical: "/about" },
 };
 
 export default function AboutPage() {
@@ -85,6 +86,21 @@ export default function AboutPage() {
                 orders@certexpresss.com
               </a>
               .
+            </p>
+          </section>
+
+          <section className="border-t border-gray-200 pt-6">
+            <h2 className="text-xl font-semibold text-gray-900 mb-3">
+              Why carriers use CertExpress
+            </h2>
+            <p>
+              Thousands of motor carriers, brokers, and dispatchers use
+              CertExpress to pull FMCSA Certificates of Authority, USDOT
+              profiles, and motor-carrier permits on demand — without driving to
+              an FMCSA office or waiting on mailed copies. Our searchable index
+              covers carriers across every U.S. state, is refreshed daily from
+              the public FMCSA release, and delivers each document as a clean,
+              broker-ready PDF the instant payment clears.
             </p>
           </section>
         </div>

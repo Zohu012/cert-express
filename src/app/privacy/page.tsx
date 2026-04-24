@@ -2,6 +2,7 @@ import { PublicLayout } from "@/components/public-layout";
 
 export const metadata = {
   title: "Privacy Policy | CertExpress",
+  alternates: { canonical: "/privacy" },
 };
 
 export default function PrivacyPage() {

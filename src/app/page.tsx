@@ -6,6 +6,25 @@ import { Card } from "@/components/ui/card";
 import { PublicLayout } from "@/components/public-layout";
 import { SearchResultCard } from "@/components/search-result-card";
 
+export const metadata = {
+  alternates: { canonical: "/" },
+};
+
+const homepageFaqs = [
+  {
+    q: "Can I review my details before completing the download?",
+    a: "Yes. You can view key document details and a preview before proceeding, so you can confirm it matches your company record.",
+  },
+  {
+    q: "How quickly will I receive my document?",
+    a: "Instantly. Once your payment is successful, the PDF is available on-screen and sent to your email.",
+  },
+  {
+    q: "What if my company details are incorrect?",
+    a: "If your company details are incorrect, you will receive a full refund. No document, no charge.",
+  },
+];
+
 export default async function HomePage({
   searchParams,
 }: {
@@ -64,8 +83,27 @@ export default async function HomePage({
     };
   }
 
+  const homepageFaqJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    mainEntity: homepageFaqs.map((f) => ({
+      "@type": "Question",
+      name: f.q,
+      acceptedAnswer: {
+        "@type": "Answer",
+        text: f.a,
+      },
+    })),
+  };
+
   return (
     <PublicLayout>
+      {!searched && (
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(homepageFaqJsonLd) }}
+        />
+      )}
       {/* Hero + Search */}
       <section
         id="search"
@@ -73,7 +111,7 @@ export default async function HomePage({
       >
         <div className="max-w-3xl mx-auto px-4 text-center">
           <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold tracking-tight mb-4">
-            Your FMCSA Certificate of Authority,
+            Your FMCSA Certificate of Authority in the United States,
             <span className="block text-green-300 mt-2">delivered in minutes.</span>
           </h1>
           <p className="text-blue-100 text-base sm:text-lg mb-8 max-w-2xl mx-auto">
@@ -309,7 +347,7 @@ export default async function HomePage({
                 </div>
                 <div>
                   <p className="text-3xl sm:text-4xl font-bold text-green-300">
-                    {(200 + stats.delivered).toLocaleString()}
+                    {(400 + stats.delivered).toLocaleString()}
                   </p>
                   <p className="mt-1 text-sm text-blue-200">Documents delivered</p>
                 </div>
@@ -324,20 +362,7 @@ export default async function HomePage({
                 Frequently asked
               </h2>
               <div className="space-y-4">
-                {[
-                  {
-                    q: "Can I review my details before completing the download?",
-                    a: "Yes. You can view key document details and a preview before proceeding, so you can confirm it matches your company record."
-                  },
-                  {
-                    q: "How quickly will I receive my document?",
-                    a: "Instantly. Once your payment is successful, the PDF is available on-screen and sent to your email."
-                  },
-                  {
-                    q: "What if my company details are incorrect?",
-                    a: "If your company details are incorrect, you will receive a full refund. No document, no charge."
-                  }
-                ].map((item) => (
+                {homepageFaqs.map((item) => (
                   <div key={item.q} className="bg-white border border-gray-200 rounded-lg p-5">
                     <p className="font-semibold text-gray-900">{item.q}</p>
                     <p className="mt-2 text-sm text-gray-600 leading-relaxed">{item.a}</p>

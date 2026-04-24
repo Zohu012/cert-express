@@ -9,6 +9,10 @@ import { PublicLayout } from "@/components/public-layout";
 import { PayPagePreview } from "@/components/pay-page-preview";
 import { StickyPayBar } from "@/components/sticky-pay-bar";
 
+export const metadata = {
+  robots: { index: false, follow: false },
+};
+
 export default async function PayPage({
   params,
 }: {
@@ -59,12 +63,7 @@ export default async function PayPage({
               <span>DOT: {company.usdotNumber}</span>
               <span>Date: {dateStr}</span>
             </div>
-            {successfulOrderCount >= 25 && (
-              <p className="mt-2 text-xs text-green-700">
-                <strong>{successfulOrderCount.toLocaleString()}</strong>{" "}
-                companies served
-              </p>
-            )}
+            
           </div>
 
           <Card>

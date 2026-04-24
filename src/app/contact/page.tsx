@@ -2,6 +2,7 @@ import { PublicLayout } from "@/components/public-layout";
 
 export const metadata = {
   title: "Contact | CertExpress",
+  alternates: { canonical: "/contact" },
 };
 
 export default function ContactPage() {
@@ -71,6 +72,19 @@ export default function ContactPage() {
           CertExpress is operated by NaachTech and is not affiliated with any
           government agency.
         </p>
+
+        <section className="mt-10 text-sm text-gray-600 leading-relaxed">
+          <h2 className="text-base font-semibold text-gray-900 mb-2">
+            About CertExpress
+          </h2>
+          <p>
+            CertExpress is a private document-retrieval service that delivers
+            FMCSA Certificates of Authority, operating permits, and motor
+            carrier licenses as instant PDF downloads. Our team answers every
+            support email personally — if something is off with your order, a
+            real person will resend the link or process a refund promptly.
+          </p>
+        </section>
       </div>
     </PublicLayout>
   );

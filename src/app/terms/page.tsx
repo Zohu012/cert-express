@@ -6,6 +6,7 @@ export const dynamic = "force-dynamic";
 
 export const metadata = {
   title: "Terms of Service | CertExpress",
+  alternates: { canonical: "/terms" },
 };
 
 const DEFAULT_TERMS = `

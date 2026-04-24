@@ -2,6 +2,7 @@ import { PublicLayout } from "@/components/public-layout";
 
 export const metadata = {
   title: "Impressum | CertExpress",
+  alternates: { canonical: "/impressum" },
 };
 
 export default function ImpressumPage() {

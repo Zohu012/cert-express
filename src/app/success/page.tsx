@@ -4,6 +4,10 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { PublicLayout } from "@/components/public-layout";
 
+export const metadata = {
+  robots: { index: false, follow: false },
+};
+
 export default async function SuccessPage({
   searchParams,
 }: {

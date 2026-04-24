@@ -88,14 +88,19 @@ export default async function CompanyDetail({ params }: PageProps) {
 
   const name = company.companyName || `USDOT ${company.usdotNumber}`;
   const loc = [company.city, company.state].filter(Boolean).join(", ");
+  const pageUrl = `https://www.certexpresss.com/companies/${company.usdotNumber}`;
 
   // JSON-LD: public fields only. No masked PII. Address uses locality only.
-  const jsonLd = {
+  const orgJsonLd = {
     "@context": "https://schema.org",
     "@type": "Organization",
     name,
-    identifier: `USDOT ${company.usdotNumber}`,
-    url: `https://www.certexpresss.com/companies/${company.usdotNumber}`,
+    identifier: {
+      "@type": "PropertyValue",
+      propertyID: "USDOT",
+      value: company.usdotNumber,
+    },
+    url: pageUrl,
     ...(company.city || company.state || company.zipCode
       ? {
           address: {
@@ -108,6 +113,57 @@ export default async function CompanyDetail({ params }: PageProps) {
         }
       : {}),
   };
+
+  const breadcrumbJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: [
+      {
+        "@type": "ListItem",
+        position: 1,
+        name: "Home",
+        item: "https://www.certexpresss.com",
+      },
+      {
+        "@type": "ListItem",
+        position: 2,
+        name: "Companies",
+        item: "https://www.certexpresss.com/companies",
+      },
+      {
+        "@type": "ListItem",
+        position: 3,
+        name,
+        item: pageUrl,
+      },
+    ],
+  };
+
+  // Default price used for structured-data Offer. Mirrors getPriceCents() default.
+  const offerPriceUsd = "30.00";
+  const productJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "Product",
+    name: `FMCSA Certificate of Authority — ${name} (USDOT ${company.usdotNumber})`,
+    description: `Official FMCSA Certificate of Authority document for ${name}${loc ? `, ${loc}` : ""}. Instant PDF delivery after payment.`,
+    brand: {
+      "@type": "Brand",
+      name: "CertExpress",
+    },
+    offers: {
+      "@type": "Offer",
+      url: pageUrl,
+      priceCurrency: "USD",
+      price: offerPriceUsd,
+      availability: "https://schema.org/InStock",
+      seller: {
+        "@type": "Organization",
+        name: "CertExpress",
+      },
+    },
+  };
+
+  const jsonLd = [orgJsonLd, breadcrumbJsonLd, productJsonLd];
 
   return (
     <PublicLayout>
@@ -298,6 +354,42 @@ export default async function CompanyDetail({ params }: PageProps) {
             </Link>
           </Card>
         </div>
+      </div>
+
+      <div className="max-w-5xl mx-auto px-4 pb-10 space-y-6">
+        <Card>
+          <h2 className="text-lg font-semibold text-gray-900 mb-3">
+            About USDOT {company.usdotNumber}
+          </h2>
+          <p className="text-sm text-gray-700 leading-relaxed">
+            USDOT {company.usdotNumber} identifies {name}
+            {loc ? ` of ${loc}` : ""} within the Federal Motor Carrier Safety
+            Administration (FMCSA) registry. Every interstate motor carrier
+            operating commercially in the United States is assigned a unique
+            USDOT number that links to its safety record, operating authority,
+            insurance filings, and inspection history. Use this number to look
+            up the carrier on SAFER, verify a broker or shipper&rsquo;s record,
+            or pull the official Certificate of Authority document.
+          </p>
+        </Card>
+
+        {company.authorityStatus && (
+          <Card>
+            <h2 className="text-lg font-semibold text-gray-900 mb-3">
+              About {company.authorityStatus} authority
+            </h2>
+            <p className="text-sm text-gray-700 leading-relaxed">
+              FMCSA operating authority with status &ldquo;
+              {company.authorityStatus}&rdquo; indicates the current eligibility
+              of the carrier to haul regulated freight or passengers across
+              state lines. Brokers, shippers, and insurers typically check this
+              field before onboarding a new carrier. The Certificate of
+              Authority is the signed FMCSA document that confirms this status
+              in writing — it&rsquo;s what you receive as a PDF through
+              CertExpress.
+            </p>
+          </Card>
+        )}
       </div>
     </PublicLayout>
   );
