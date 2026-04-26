@@ -341,7 +341,7 @@ export default async function HomePage({
                 </div>
                 <div>
                   <p className="text-3xl sm:text-4xl font-bold text-green-300">
-                    {stats.states}
+                    50
                   </p>
                   <p className="mt-1 text-sm text-blue-200">U.S. states covered</p>
                 </div>
