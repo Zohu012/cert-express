@@ -11,8 +11,8 @@ import { EmailRateChart, type DailyStat } from "@/components/email-rate-chart";
 
 // ─── Sortable columns ────────────────────────────────────────────────────────
 const SORTABLE_COLS = [
-  "sentAt", "companyName", "usdotNumber", "toEmail", "subject",
-  "clickCount", "lastClickAt", "openCount", "firstOpenAt",
+  "sentAt", "serviceDate", "companyName", "usdotNumber", "toEmail",
+  "clickCount", "lastClickAt", "openCount", "firstOpenAt", "orderDate",
 ] as const;
 type SortCol = typeof SORTABLE_COLS[number];
 
@@ -22,16 +22,20 @@ function toSortCol(s: string | undefined): SortCol {
     : "sentAt";
 }
 
+// orderDate is computed in JS (Prisma can't orderBy a relation aggregate),
+// so it is intentionally absent from this map.
+type PrismaSortCol = Exclude<SortCol, "orderDate">;
+
 function makeOrderBy(
-  col: SortCol,
+  col: PrismaSortCol,
   dir: "asc" | "desc"
 ): Prisma.EmailLogOrderByWithRelationInput {
-  const map: Record<SortCol, Prisma.EmailLogOrderByWithRelationInput> = {
+  const map: Record<PrismaSortCol, Prisma.EmailLogOrderByWithRelationInput> = {
     sentAt:       { sentAt:      dir },
+    serviceDate:  { company: { serviceDate: dir } },
     companyName:  { company: { companyName:  dir } },
     usdotNumber:  { company: { usdotNumber:  dir } },
     toEmail:      { toEmail:     dir },
-    subject:      { subject:     dir },
     clickCount:   { clickCount:  dir },
     lastClickAt:  { lastClickAt: dir },
     openCount:    { openCount:   dir },
@@ -91,7 +95,6 @@ export default async function EmailHistoryPage({
   if (query) {
     where.OR = [
       { toEmail:  { contains: query } },
-      { subject:  { contains: query } },
       { company: { companyName: { contains: query } } },
       { company: { usdotNumber: { contains: query } } },
     ];
@@ -102,19 +105,6 @@ export default async function EmailHistoryPage({
   else if (clickFilter === "no") where.clickCount = 0;
   if (openedFilter === "yes") where.openCount = { gt: 0 };
   else if (openedFilter === "no") where.openCount = 0;
-
-  // ── Paginated logs ──────────────────────────────────────────────────────────
-  const [logs, total] = await Promise.all([
-    prisma.emailLog.findMany({
-      where,
-      orderBy: makeOrderBy(sortBy, sortDir),
-      skip: (page - 1) * perPage,
-      take: perPage,
-      include: { company: { select: { companyName: true, usdotNumber: true } } },
-    }),
-    prisma.emailLog.count({ where }),
-  ]);
-  const totalPages = Math.ceil(total / perPage);
 
   // ── Stats — reflect ALL active filters (search, date range, click, opened).
   //    When no filters are applied, stats cover every row in EmailLog.
@@ -152,6 +142,55 @@ export default async function EmailHistoryPage({
         select: { companyId: true, amount: true, createdAt: true },
       })
     : [];
+
+  // companyId → most recent completed order createdAt (for the Order Date column)
+  const latestOrderByCompany = new Map<string, Date>();
+  for (const o of paidOrders) {
+    const existing = latestOrderByCompany.get(o.companyId);
+    if (!existing || o.createdAt > existing) {
+      latestOrderByCompany.set(o.companyId, o.createdAt);
+    }
+  }
+
+  // ── Paginated logs ──────────────────────────────────────────────────────────
+  // Sorting by orderDate is handled in JS because Prisma can't orderBy a
+  // relation aggregate (MAX(orders.createdAt)). Other columns use Prisma orderBy.
+  const logsInclude = {
+    company: { select: { companyName: true, usdotNumber: true, serviceDate: true } },
+  } as const;
+
+  let logs: Prisma.EmailLogGetPayload<{ include: typeof logsInclude }>[];
+  let total: number;
+  if (sortBy === "orderDate") {
+    const all = await prisma.emailLog.findMany({ where, include: logsInclude });
+    // Nulls last in both directions: rows without a completed order sink to the
+    // bottom regardless of asc/desc — operators usually want to see the rows
+    // that DO have orders, ordered by recency.
+    all.sort((a, b) => {
+      const da = latestOrderByCompany.get(a.companyId);
+      const db = latestOrderByCompany.get(b.companyId);
+      if (!da && !db) return 0;
+      if (!da) return 1;
+      if (!db) return -1;
+      return sortDir === "asc"
+        ? da.getTime() - db.getTime()
+        : db.getTime() - da.getTime();
+    });
+    total = all.length;
+    logs = all.slice((page - 1) * perPage, page * perPage);
+  } else {
+    [logs, total] = await Promise.all([
+      prisma.emailLog.findMany({
+        where,
+        orderBy: makeOrderBy(sortBy, sortDir),
+        skip: (page - 1) * perPage,
+        take: perPage,
+        include: logsInclude,
+      }),
+      prisma.emailLog.count({ where }),
+    ]);
+  }
+  const totalPages = Math.ceil(total / perPage);
 
   // Only count orders placed after the first email to that company
   const attributed = paidOrders.filter((o) => {
@@ -291,6 +330,19 @@ export default async function EmailHistoryPage({
     );
   }
 
+  function buildExportUrl() {
+    const params: Record<string, string> = { sort: sortBy, dir: sortDir };
+    if (query)        params.q        = query;
+    if (dateFrom)     params.dateFrom = dateFrom;
+    if (dateTo)       params.dateTo   = dateTo;
+    if (clickFilter)  params.clicks   = clickFilter;
+    if (openedFilter) params.opened   = openedFilter;
+    const qs = Object.entries(params)
+      .map(([k, v]) => `${k}=${encodeURIComponent(v)}`)
+      .join("&");
+    return `/api/admin/email-logs/export?${qs}`;
+  }
+
   function SortHeader({ col, label }: { col: SortCol; label: string }) {
     const isActive = sortBy === col;
     const nextDir  = isActive && sortDir === "desc" ? "asc" : "desc";
@@ -355,7 +407,7 @@ export default async function EmailHistoryPage({
             type="text"
             name="q"
             defaultValue={query}
-            placeholder="Search by email, company, USDOT, or subject"
+            placeholder="Search by email, company, or USDOT"
             className="flex-1 min-w-[200px] rounded-lg border border-gray-300 px-3 py-2 text-sm"
           />
           <div className="flex items-center gap-1">
@@ -410,6 +462,12 @@ export default async function EmailHistoryPage({
               Clear
             </a>
           )}
+          <a
+            href={buildExportUrl()}
+            className="rounded-lg bg-green-600 px-4 py-2 text-sm text-white hover:bg-green-700"
+          >
+            Export CSV
+          </a>
         </form>
 
         {/* Active filter chips */}
@@ -465,28 +523,31 @@ export default async function EmailHistoryPage({
           <thead className="bg-gray-50 border-b border-gray-200">
             <tr>
               <SortHeader col="sentAt"      label="Sent At" />
+              <SortHeader col="serviceDate" label="Doc Date" />
               <SortHeader col="companyName" label="Company" />
               <SortHeader col="usdotNumber" label="US DOT #" />
               <SortHeader col="toEmail"     label="Email" />
-              <SortHeader col="subject"     label="Subject" />
               <SortHeader col="openCount"   label="Opened" />
               <SortHeader col="clickCount"  label="Clicks" />
               <SortHeader col="lastClickAt" label="Last Click" />
+              <SortHeader col="orderDate"   label="Order Date" />
               <th className="px-3 py-2" />
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
             {logs.length === 0 && (
               <tr>
-                <td colSpan={9} className="px-3 py-8 text-center text-gray-400">
+                <td colSpan={10} className="px-3 py-8 text-center text-gray-400">
                   No email logs found.
                 </td>
               </tr>
             )}
             {logs.map((log) => {
               const sentDate  = new Date(log.sentAt);
+              const docDate   = log.company.serviceDate ? new Date(log.company.serviceDate) : null;
               const lastClick = log.lastClickAt ? new Date(log.lastClickAt) : null;
               const firstOpen = log.firstOpenAt ? new Date(log.firstOpenAt) : null;
+              const latestOrder = latestOrderByCompany.get(log.companyId) ?? null;
               return (
                 <tr key={log.id} className="hover:bg-gray-50 transition">
                   <td className="px-3 py-2 whitespace-nowrap text-gray-600 text-xs">
@@ -494,6 +555,9 @@ export default async function EmailHistoryPage({
                     <span className="text-gray-400">
                       {sentDate.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}
                     </span>
+                  </td>
+                  <td className="px-3 py-2 text-gray-600 whitespace-nowrap text-xs">
+                    {docDate ? docDate.toLocaleDateString("en-US") : "—"}
                   </td>
                   <td className="px-3 py-2 font-medium text-gray-900 max-w-[150px] truncate">
                     {log.company.companyName}
@@ -503,9 +567,6 @@ export default async function EmailHistoryPage({
                   </td>
                   <td className="px-3 py-2 text-gray-600 max-w-[160px] truncate text-xs">
                     {log.toEmail}
-                  </td>
-                  <td className="px-3 py-2 text-gray-600 max-w-[180px] truncate text-xs" title={log.subject}>
-                    {log.subject}
                   </td>
                   <td className="px-3 py-2 whitespace-nowrap">
                     {firstOpen ? (
@@ -531,6 +592,9 @@ export default async function EmailHistoryPage({
                     {lastClick
                       ? `${lastClick.toLocaleDateString("en-US")} ${lastClick.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}`
                       : "—"}
+                  </td>
+                  <td className="px-3 py-2 text-gray-500 whitespace-nowrap text-xs">
+                    {latestOrder ? latestOrder.toLocaleDateString("en-US") : "—"}
                   </td>
                   <td className="px-3 py-2 text-right">
                     <DeleteEmailLogButton id={log.id} />
