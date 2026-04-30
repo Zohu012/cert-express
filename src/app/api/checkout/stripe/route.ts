@@ -52,7 +52,7 @@ export async function POST(req: NextRequest) {
       ],
       mode: "payment",
       success_url: `${appUrl}/success?token=${order.downloadToken}`,
-      cancel_url: `${appUrl}/cancel`,
+      cancel_url: `${appUrl}/cancel?companyId=${company.id}`,
       metadata: {
         orderId: order.id,
         companyId: company.id,

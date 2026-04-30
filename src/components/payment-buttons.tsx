@@ -2,7 +2,6 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { Button } from "@/components/ui/button";
 import { STICKY_PAY_EVENT } from "@/components/sticky-pay-bar";
 
 type Gtag = (
@@ -111,13 +110,6 @@ export function PaymentButtons({
     }
   }
 
-  const ctaLabel =
-    loading === "stripe"
-      ? "Redirecting..."
-      : priceDisplay
-      ? `Get PDF Copy — $${priceDisplay}`
-      : "Get PDF Copy";
-
   // Suppress unused-function warning while PayPal is hidden
   void handlePayPal;
 
@@ -136,9 +128,11 @@ export function PaymentButtons({
     return () => window.removeEventListener(STICKY_PAY_EVENT, onStickyClick);
   }, [companyId]);
 
+  const isLoading = loading === "stripe";
+
   return (
     <div id="pay-form" className="space-y-3">
-      {/* Mandatory consent checkbox — softened visually */}
+      {/* Mandatory consent checkbox */}
       <div
         className={`rounded-lg px-3 py-2 border transition-colors ${
           showTermsError && !agreed
@@ -180,7 +174,7 @@ export function PaymentButtons({
 
       {showTermsError && !agreed && (
         <p className="text-sm font-medium text-center text-red-600">
-          ⚠ Please accept the Terms of Service to continue.
+          &#9888; Please accept the Terms of Service to continue.
         </p>
       )}
 
@@ -190,32 +184,26 @@ export function PaymentButtons({
         </div>
       )}
 
-      <Button
-        variant="success"
+      <button
+        type="button"
         onClick={handleStripe}
-        disabled={loading !== null}
-        className="w-full !py-4 !text-base !font-bold shadow-sm"
+        disabled={isLoading}
+        className="w-full flex items-center justify-between gap-3 rounded-lg bg-[#635bff] hover:bg-[#5046e5] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#635bff] text-white px-5 py-4 font-semibold shadow-sm transition disabled:opacity-60 disabled:cursor-not-allowed"
       >
-        {ctaLabel}
-      </Button>
+        <span className="flex items-center gap-2 text-base">
+          <span aria-hidden="true">&#128274;</span>
+          {isLoading ? "Redirecting to Stripe…" : "Checkout with Stripe"}
+        </span>
+        {priceDisplay && !isLoading && (
+          <span className="text-base font-bold">${priceDisplay}</span>
+        )}
+      </button>
 
-      {/* PayPal hidden while account is under review */}
-
-      <p className="text-xs text-gray-500 text-center">
-        Secure checkout · Instant download after payment
+      <p className="text-[11px] text-gray-500 text-center">
+        Powered by Stripe &middot; Cards, Apple Pay, Google Pay &middot; 256-bit SSL
       </p>
 
-      <p className="text-xs text-center">
-        <Link
-          href="/faq"
-          target="_blank"
-          className="text-blue-600 hover:underline"
-        >
-          Questions? See our FAQ
-        </Link>
-      </p>
-
-      <p className="text-[11px] text-gray-400 text-center pt-1">
+      <p className="text-[11px] text-gray-400 text-center pt-1 leading-relaxed">
         CertExpress is a private service and is not affiliated with FMCSA or
         any government agency.
       </p>

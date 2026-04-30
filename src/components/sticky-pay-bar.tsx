@@ -39,9 +39,9 @@ export function StickyPayBar({ priceDisplay }: { priceDisplay: string }) {
       <button
         type="button"
         onClick={handleClick}
-        className="flex-1 text-center bg-green-600 hover:bg-green-700 text-white font-bold py-3 rounded-lg shadow-sm"
+        className="flex-1 text-center bg-[#635bff] hover:bg-[#5046e5] text-white font-bold py-3 rounded-lg shadow-sm"
       >
-        Get PDF Copy
+        Checkout — ${priceDisplay}
       </button>
     </div>
   );

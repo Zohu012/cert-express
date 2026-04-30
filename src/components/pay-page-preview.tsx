@@ -18,26 +18,33 @@ export function PayPagePreview({
 
   return (
     <>
-      <div className="mb-6">
-        <p className="text-sm text-gray-500 mb-2 font-medium text-center">
+      <div className="mb-4">
+        <p className="text-sm text-gray-500 mb-2 font-medium">
           Preview of your FMCSA document
         </p>
         <button
           type="button"
           onClick={() => setModalOpen(true)}
-          className="relative group block w-full max-w-md mx-auto rounded-lg overflow-hidden border border-gray-200 shadow cursor-pointer"
+          className="relative group block w-full rounded-lg overflow-hidden border border-gray-200 shadow-sm cursor-pointer bg-gray-50"
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={previewUrl}
             alt={`Document preview for ${companyName}`}
-            className="w-full transition-transform duration-200 group-hover:scale-[1.02]"
+            className="w-full max-h-72 lg:max-h-80 object-cover object-top transition-transform duration-200 group-hover:scale-[1.02]"
           />
           <span className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
             <span className="bg-white/90 text-gray-900 text-sm font-medium px-4 py-2 rounded-lg shadow">
               View Full Preview
             </span>
           </span>
+        </button>
+        <button
+          type="button"
+          onClick={() => setModalOpen(true)}
+          className="mt-2 text-xs text-blue-600 underline hover:text-blue-700"
+        >
+          View full preview
         </button>
       </div>
 

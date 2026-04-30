@@ -7,7 +7,13 @@ export const metadata = {
   robots: { index: false, follow: false },
 };
 
-export default function CancelPage() {
+export default async function CancelPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ companyId?: string }>;
+}) {
+  const { companyId } = await searchParams;
+
   return (
     <PublicLayout>
       <div className="flex-1 flex items-center justify-center py-10 px-4">
@@ -32,11 +38,30 @@ export default function CancelPage() {
               Payment Cancelled
             </h1>
             <p className="text-gray-500 mb-6">
-              Your payment was cancelled. No charges were made.
+              {companyId
+                ? "No charges were made. You can return to your document and try again."
+                : "Your payment was cancelled. No charges were made."}
             </p>
-            <Link href="/">
-              <Button variant="secondary">Back to Search</Button>
-            </Link>
+
+            {companyId ? (
+              <div className="space-y-3">
+                <Link href={`/pay/${companyId}`} className="block">
+                  <Button variant="success" className="w-full !py-3 !text-base">
+                    Return to your payment page
+                  </Button>
+                </Link>
+                <Link
+                  href="/"
+                  className="inline-block text-sm text-blue-600 hover:underline"
+                >
+                  ← Back to search
+                </Link>
+              </div>
+            ) : (
+              <Link href="/">
+                <Button variant="secondary">Back to Search</Button>
+              </Link>
+            )}
           </Card>
         </div>
       </div>

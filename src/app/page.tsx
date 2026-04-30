@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { PublicLayout } from "@/components/public-layout";
 import { SearchResultCard } from "@/components/search-result-card";
+import { ScrollToResults } from "@/components/scroll-to-results";
 
 export const metadata = {
   alternates: { canonical: "/" },
@@ -168,7 +169,7 @@ export default async function HomePage({
 
       {/* Results block — unchanged behavior */}
       {searched && (
-        <div className="max-w-5xl mx-auto px-4 py-8">
+        <div id="results" className="max-w-5xl mx-auto px-4 py-8 scroll-mt-4">
           {companies.length === 0 && (
             <div className="text-center py-12 text-gray-500">
               <p className="text-lg">No results found for &quot;{query}&quot;</p>
@@ -178,6 +179,7 @@ export default async function HomePage({
 
           {companies.length > 0 && (
             <div className="space-y-4">
+              <ScrollToResults />
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <p className="text-sm text-gray-500">

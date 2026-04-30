@@ -52,7 +52,7 @@ export function SiteNav() {
             href="/#search"
             className="inline-flex items-center rounded-lg bg-green-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-green-700 transition"
           >
-            Get Certificate
+            Search for Certificates
           </Link>
         </nav>
 
@@ -99,7 +99,7 @@ export function SiteNav() {
               onClick={() => setOpen(false)}
               className="mt-2 block rounded-md bg-green-600 px-3 py-2 text-center text-base font-semibold text-white hover:bg-green-700"
             >
-              Get Certificate
+              Search for Certificates
             </Link>
           </nav>
         </div>
