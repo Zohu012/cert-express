@@ -66,12 +66,12 @@ export function PreviewModal({
           <div className="flex flex-wrap gap-x-6 gap-y-1 text-sm text-gray-600 mb-3">
             <span><strong>Company:</strong> {companyName}</span>
             <span><strong>Document:</strong> {documentNumber}</span>
-            <span><strong>Date:</strong> {serviceDate}</span>
+            <span><strong>Service Date:</strong> {serviceDate}</span>
           </div>
 
           <div className="text-center pt-2 border-t border-gray-100">
             <p className="text-sm text-gray-500 mt-2">
-              Pay to unlock and download the full document.
+              Purchase to download the full document.
             </p>
           </div>
         </div>

@@ -1,8 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
-import { STICKY_PAY_EVENT } from "@/components/sticky-pay-bar";
 
 type Gtag = (
   command: "event",
@@ -21,17 +20,20 @@ export function PaymentButtons({
   termsVersion = "1.0",
   priceDisplay,
   priceCents,
+  initialPriceDisplay,
+  savingsDisplay,
 }: {
   companyId: string;
   termsVersion?: string;
   priceDisplay?: string;
   priceCents?: number;
+  initialPriceDisplay?: string | null;
+  savingsDisplay?: string | null;
 }) {
   const [agreed, setAgreed] = useState(false);
   const [showTermsError, setShowTermsError] = useState(false);
   const [loading, setLoading] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const handleStripeRef = useRef<() => void>(() => {});
 
   function requireAgreed() {
     if (!agreed) {
@@ -76,63 +78,51 @@ export function PaymentButtons({
     }
   }
 
-  async function handlePayPal() {
-    track("pay_button_click", { method: "paypal", company_id: companyId });
-    if (!requireAgreed()) return;
-    track("begin_checkout", {
-      currency: "USD",
-      value: typeof priceCents === "number" ? priceCents / 100 : undefined,
-      company_id: companyId,
-      method: "paypal",
-    });
-    setLoading("paypal");
-    setError(null);
-    try {
-      const res = await fetch("/api/checkout/paypal/create-order", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          companyId,
-          termsAcceptedAt: new Date().toISOString(),
-          termsVersion,
-        }),
-      });
-      const data = await res.json();
-      if (data.approveUrl) {
-        window.location.href = data.approveUrl;
-      } else {
-        setError(data.error || "Failed to create PayPal order");
-      }
-    } catch {
-      setError("Something went wrong. Please try again.");
-    } finally {
-      setLoading(null);
-    }
-  }
-
-  // Suppress unused-function warning while PayPal is hidden
-  void handlePayPal;
-
-  // Keep ref in sync so the global listener always calls the latest closure
-  handleStripeRef.current = handleStripe;
-
-  // Listen for the sticky mobile bar: it just fires this event; we run the
-  // same checkout logic (terms gate + Stripe redirect) here so there is one
-  // source of truth.
-  useEffect(() => {
-    const onStickyClick = () => {
-      track("sticky_pay_click", { company_id: companyId });
-      handleStripeRef.current();
-    };
-    window.addEventListener(STICKY_PAY_EVENT, onStickyClick);
-    return () => window.removeEventListener(STICKY_PAY_EVENT, onStickyClick);
-  }, [companyId]);
-
   const isLoading = loading === "stripe";
 
   return (
-    <div id="pay-form" className="space-y-3">
-      {/* Mandatory consent checkbox */}
+    <div id="pay-form" className="space-y-4">
+      {/* Pricing */}
+      <div>
+        <p className="text-xs uppercase tracking-wide text-gray-500">
+          One-time payment &middot; Total today
+        </p>
+        <div className="mt-1 flex items-baseline flex-wrap gap-x-3 gap-y-1">
+          <p className="text-3xl font-bold text-gray-900">
+            ${priceDisplay}
+          </p>
+          {initialPriceDisplay && (
+            <p className="text-base font-semibold text-gray-400 line-through">
+              ${initialPriceDisplay}
+            </p>
+          )}
+          {savingsDisplay && (
+            <span className="text-xs font-semibold bg-green-100 text-green-700 px-2 py-0.5 rounded-full">
+              Save ${savingsDisplay}
+            </span>
+          )}
+        </div>
+      </div>
+
+      {/* Trust bullets */}
+      <ul className="space-y-1.5 text-sm text-gray-700">
+        <li className="flex items-start gap-2">
+          <span className="text-green-600 mt-0.5">&#10003;</span>
+          <span>Instant PDF download after payment</span>
+        </li>
+        <li className="flex items-start gap-2">
+          <span className="text-green-600 mt-0.5">&#10003;</span>
+          <span>Encrypted checkout via Stripe &mdash; we never see your card</span>
+        </li>
+        <li className="flex items-start gap-2">
+          <span className="text-green-600 mt-0.5">&#10003;</span>
+          <Link href="/refund" target="_blank" className="hover:underline">
+            30-day money-back guarantee
+          </Link>
+        </li>
+      </ul>
+
+      {/* Terms checkbox */}
       <div
         className={`rounded-lg px-3 py-2 border transition-colors ${
           showTermsError && !agreed
@@ -203,7 +193,7 @@ export function PaymentButtons({
         Powered by Stripe &middot; Cards, Apple Pay, Google Pay &middot; 256-bit SSL
       </p>
 
-      <p className="text-[11px] text-gray-400 text-center pt-1 leading-relaxed">
+      <p className="text-[11px] text-gray-400 text-center leading-relaxed">
         CertExpress is a private service and is not affiliated with FMCSA or
         any government agency.
       </p>
