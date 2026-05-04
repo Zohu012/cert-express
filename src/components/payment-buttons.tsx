@@ -92,7 +92,7 @@ export function PaymentButtons({
             ${priceDisplay}
           </p>
           {initialPriceDisplay && (
-            <p className="text-base font-semibold text-gray-400 line-through">
+            <p className="text-base font-semibold text-gray-600 line-through">
               ${initialPriceDisplay}
             </p>
           )}

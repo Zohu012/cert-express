@@ -50,7 +50,7 @@ export function SiteNav() {
           ))}
           <Link
             href="/#search"
-            className="inline-flex items-center rounded-lg bg-green-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-green-700 transition"
+            className="inline-flex items-center rounded-lg bg-green-700 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-green-800 transition"
           >
             Search for Certificates
           </Link>
@@ -97,7 +97,7 @@ export function SiteNav() {
             <Link
               href="/#search"
               onClick={() => setOpen(false)}
-              className="mt-2 block rounded-md bg-green-600 px-3 py-2 text-center text-base font-semibold text-white hover:bg-green-700"
+              className="mt-2 block rounded-md bg-green-700 px-3 py-2 text-center text-base font-semibold text-white hover:bg-green-800"
             >
               Search for Certificates
             </Link>

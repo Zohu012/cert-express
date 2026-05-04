@@ -86,7 +86,7 @@ export function PublicLayout({ children }: { children: React.ReactNode }) {
               or any government agency. We provide assistance in accessing publicly
               available documents.
             </p>
-            <p className="mt-3 text-xs text-gray-500 text-center">
+            <p className="mt-3 text-xs text-gray-400 text-center">
               &copy; {new Date().getFullYear()} CertExpress, operated by NaachTech. All rights reserved.
             </p>
           </div>

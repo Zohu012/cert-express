@@ -23,7 +23,7 @@ export async function GET(
   return new NextResponse(file, {
     headers: {
       "Content-Type": "image/png",
-      "Cache-Control": "public, max-age=86400, immutable",
+      "Cache-Control": "public, max-age=31536000, immutable",
     },
   });
 }
