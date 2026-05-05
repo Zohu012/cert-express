@@ -99,16 +99,16 @@ export default function RootLayout({
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(siteJsonLd) }}
         />
-        <Script
-          src="https://www.googletagmanager.com/gtag/js?id=G-X8TYG1H11N"
-          strategy="afterInteractive"
-        />
         <Script id="gtag-init" strategy="afterInteractive">{`
           window.dataLayer = window.dataLayer || [];
           function gtag(){dataLayer.push(arguments);}
           gtag('js', new Date());
           gtag('config', 'G-X8TYG1H11N');
         `}</Script>
+        <Script
+          src="https://www.googletagmanager.com/gtag/js?id=G-X8TYG1H11N"
+          strategy="lazyOnload"
+        />
       </head>
       <body className="min-h-full flex flex-col bg-gray-50 text-gray-900">
         {children}

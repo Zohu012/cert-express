@@ -38,8 +38,12 @@
     "typescript": "^5"
   },
   "browserslist": [
-    "last 2 versions",
-    "not dead",
-    "not ie 11"
+    "chrome >= 90",
+    "edge >= 90",
+    "firefox >= 90",
+    "safari >= 15",
+    "ios_saf >= 15",
+    "samsung >= 16",
+    "not dead"
   ]
 }

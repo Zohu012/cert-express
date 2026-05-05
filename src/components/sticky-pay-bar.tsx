@@ -1,7 +1,19 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { PaymentButtons } from "@/components/payment-buttons";
+import dynamic from "next/dynamic";
+
+const PaymentButtons = dynamic(
+  () => import("@/components/payment-buttons").then((m) => m.PaymentButtons),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="py-6 text-center text-sm text-gray-500">
+        Loading checkout&hellip;
+      </div>
+    ),
+  },
+);
 
 export function StickyPayBar({
   companyId,
