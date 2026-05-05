@@ -260,7 +260,7 @@ export async function sendOneCompany(
     });
     emailLogId = emailLog.id;
 
-    const trackingUrl = `${appUrl}/api/track/${emailLog.id}`;
+    const trackingUrl = `${appUrl}/api/track/${emailLog.id}/${company.id}`;
     const payUrl = `${appUrl}/pay/${company.id}`;
     const openPixelUrl = `${appUrl}/api/track/open/${emailLog.id}`;
 

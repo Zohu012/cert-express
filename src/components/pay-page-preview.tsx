@@ -35,7 +35,7 @@ export function PayPagePreview({
             height={2200}
             sizes="(min-width: 1024px) 580px, 100vw"
             quality={70}
-            priority
+            preload
             fetchPriority="high"
             className="w-full h-auto block transition-transform duration-200 group-hover:scale-[1.01] will-change-transform"
           />

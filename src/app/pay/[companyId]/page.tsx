@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { prisma } from "@/lib/db";
-import { getPriceCents, getSetting } from "@/lib/settings";
+import { getSettings } from "@/lib/settings";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { PaymentButtons } from "@/components/payment-buttons";
@@ -25,11 +25,14 @@ export default async function PayPage({
 
   if (!company || !company.pdfFilename) return notFound();
 
-  const [priceCents, termsVersion, initialPriceRaw] = await Promise.all([
-    getPriceCents(),
-    getSetting("terms_version"),
-    getSetting("initial_price_cents"),
+  const settings = await getSettings([
+    "price_cents",
+    "terms_version",
+    "initial_price_cents",
   ]);
+  const priceCents = settings.price_cents ? parseInt(settings.price_cents, 10) : 3000;
+  const termsVersion = settings.terms_version ?? null;
+  const initialPriceRaw = settings.initial_price_cents ?? null;
   const priceDisplay = (priceCents / 100).toFixed(2);
   const initialPriceCents = initialPriceRaw ? parseInt(initialPriceRaw) : null;
   const initialPriceDisplay =
@@ -67,6 +70,14 @@ export default async function PayPage({
 
   return (
     <PublicLayout>
+      {previewUrl && (
+        <link
+          rel="preload"
+          as="image"
+          href={previewUrl}
+          fetchPriority="high"
+        />
+      )}
       <main className="py-6 lg:py-8">
         <div className="max-w-5xl mx-auto px-4">
           {/* Mobile-only identity banner (top of page) */}
