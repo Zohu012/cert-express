@@ -15,6 +15,9 @@ const nextConfig: NextConfig = {
   typescript: {
     ignoreBuildErrors: true,
   },
+  images: {
+    qualities: [70, 75],
+  },
   experimental: {
     serverActions: {
       bodySizeLimit: "100mb",

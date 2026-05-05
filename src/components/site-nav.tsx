@@ -32,8 +32,11 @@ export function SiteNav() {
             alt="CertExpress"
             width={280}
             height={80}
-            className="h-12 w-auto object-contain"
+            sizes="210px"
+            quality={70}
             priority
+            fetchPriority="high"
+            className="h-12 w-auto object-contain"
           />
         </Link>
 

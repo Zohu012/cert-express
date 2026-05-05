@@ -22,6 +22,9 @@ export function PublicLayout({ children }: { children: React.ReactNode }) {
                   alt="CertExpress"
                   width={240}
                   height={70}
+                  sizes="180px"
+                  quality={70}
+                  loading="lazy"
                   className="h-14 w-auto object-contain"
                 />
               </Link>

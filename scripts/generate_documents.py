@@ -188,10 +188,11 @@ def generate_preview(pdf_path: str, preview_path: str, original_pdf_path: str | 
     # Prefer the original FMCSA PDF for a more authentic preview
     source_pdf = original_pdf_path if original_pdf_path and os.path.exists(original_pdf_path) else pdf_path
 
-    # Render at 200 DPI for ~1200px width
+    # Render at 144 DPI → ~1224×1584 for US Letter (was 200 DPI/1700×2200,
+    # which was ~3× the size needed for the largest display variant served by next/image).
     pdf_doc = fitz.open(source_pdf)
     page = pdf_doc[0]
-    mat = fitz.Matrix(200 / 72, 200 / 72)  # 200 DPI
+    mat = fitz.Matrix(144 / 72, 144 / 72)
     pix = page.get_pixmap(matrix=mat, alpha=False)
     pdf_doc.close()
 
