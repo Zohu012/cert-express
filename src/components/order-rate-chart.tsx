@@ -4,8 +4,13 @@ import { useMemo, useState } from "react";
 
 export interface DailyOrderStat {
   date: string;        // YYYY-MM-DD
-  orders: number;      // number of orders that day
+  orders: number;      // number of orders that day (by createdAt)
   revenueCents: number; // total revenue (in cents) from completed orders that day
+  // Orders attributed to documents whose Company.serviceDate is this day,
+  // regardless of when the order was placed.
+  serviceDayOrders: number;
+  // Per-order-date breakdown of those orders, sorted by count desc.
+  serviceDayBreakdown: { date: string; count: number }[];
 }
 
 interface Props {
@@ -27,7 +32,10 @@ export function OrderRateChart({ data }: Props) {
   const innerW = W - padL - padR;
   const innerH = H - padT - padB;
 
-  const maxCount = Math.max(5, ...series.map((d) => d.orders));
+  const maxCount = Math.max(
+    5,
+    ...series.map((d) => Math.max(d.orders, d.serviceDayOrders))
+  );
   const yMax = Math.ceil(maxCount / 5) * 5;
 
   const xFor = (i: number) =>
@@ -38,6 +46,11 @@ export function OrderRateChart({ data }: Props) {
 
   const ordersPath = series
     .map((d, i) => `${i === 0 ? "M" : "L"}${xFor(i)},${yFor(d.orders)}`)
+    .join(" ");
+  const serviceOrdersPath = series
+    .map(
+      (d, i) => `${i === 0 ? "M" : "L"}${xFor(i)},${yFor(d.serviceDayOrders)}`
+    )
     .join(" ");
 
   const yTicks = [0, 0.25, 0.5, 0.75, 1].map((f) => ({
@@ -73,11 +86,16 @@ export function OrderRateChart({ data }: Props) {
   const hovered = hoverIdx != null ? series[hoverIdx] : null;
   const hoverX = hoverIdx != null ? xFor(hoverIdx) : 0;
 
-  const tooltipW = 200;
+  const tooltipW = 240;
   const tooltipFlipLeft = hoverX + 12 + tooltipW > W - padR;
 
   const totalOrders = series.reduce((s, d) => s + d.orders, 0);
   const totalRevenue = series.reduce((s, d) => s + d.revenueCents, 0);
+
+  function fmtBreakdownDate(s: string) {
+    const d = new Date(s + "T00:00:00");
+    return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  }
 
   return (
     <div className="mb-5 rounded-xl border border-gray-200 bg-white overflow-hidden">
@@ -99,6 +117,10 @@ export function OrderRateChart({ data }: Props) {
             <span className="inline-flex items-center gap-1.5">
               <span className="inline-block w-3 h-0.5 bg-blue-500" />
               Orders / day
+            </span>
+            <span className="inline-flex items-center gap-1.5">
+              <span className="inline-block w-3 h-0.5 bg-purple-500" />
+              By service date
             </span>
           </div>
           <div className="inline-flex rounded-md border border-gray-300 overflow-hidden">
@@ -200,6 +222,14 @@ export function OrderRateChart({ data }: Props) {
           )}
 
           <path
+            d={serviceOrdersPath}
+            fill="none"
+            stroke="#a855f7"
+            strokeWidth={2}
+            strokeLinejoin="round"
+            strokeLinecap="round"
+          />
+          <path
             d={ordersPath}
             fill="none"
             stroke="#3b82f6"
@@ -209,13 +239,20 @@ export function OrderRateChart({ data }: Props) {
           />
 
           {series.map((d, i) => (
-            <circle
-              key={`pt-${i}`}
-              cx={xFor(i)}
-              cy={yFor(d.orders)}
-              r={hoverIdx === i ? 4.5 : 2.5}
-              fill="#3b82f6"
-            />
+            <g key={`pt-${i}`}>
+              <circle
+                cx={xFor(i)}
+                cy={yFor(d.serviceDayOrders)}
+                r={hoverIdx === i ? 4.5 : 2.5}
+                fill="#a855f7"
+              />
+              <circle
+                cx={xFor(i)}
+                cy={yFor(d.orders)}
+                r={hoverIdx === i ? 4.5 : 2.5}
+                fill="#3b82f6"
+              />
+            </g>
           ))}
         </svg>
 
@@ -257,6 +294,42 @@ export function OrderRateChart({ data }: Props) {
                   maximumFractionDigits: 2,
                 })}
               </span>
+            </div>
+            <div className="mt-1 pt-1 border-t border-gray-100">
+              <div className="flex items-center justify-between gap-2 py-0.5">
+                <span className="inline-flex items-center gap-1.5 text-gray-600">
+                  <span className="inline-block w-2 h-2 rounded-full bg-purple-500" />
+                  Docs w/ this service date
+                </span>
+                <span className="font-semibold text-gray-800">
+                  {hovered.serviceDayOrders.toLocaleString()}
+                </span>
+              </div>
+              {hovered.serviceDayBreakdown.length > 0 ? (
+                <div className="mt-1 max-h-28 overflow-auto text-[11px] text-gray-500">
+                  <div className="text-gray-400 mb-0.5">Sold on:</div>
+                  {hovered.serviceDayBreakdown.slice(0, 8).map((b) => (
+                    <div
+                      key={b.date}
+                      className="flex items-center justify-between gap-2"
+                    >
+                      <span>{fmtBreakdownDate(b.date)}</span>
+                      <span className="font-medium text-gray-700">
+                        {b.count}
+                      </span>
+                    </div>
+                  ))}
+                  {hovered.serviceDayBreakdown.length > 8 && (
+                    <div className="text-gray-400">
+                      +{hovered.serviceDayBreakdown.length - 8} more days
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="mt-1 text-[11px] text-gray-400">
+                  No orders for this service date.
+                </div>
+              )}
             </div>
           </div>
         )}

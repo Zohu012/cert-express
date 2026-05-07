@@ -172,11 +172,47 @@ export default async function OrdersPage({
       }
     }
 
-    return keys.map((k) => ({
-      date: k,
-      orders: orderCount.get(k) ?? 0,
-      revenueCents: revenueByDay.get(k) ?? 0,
-    }));
+    // ── "By service date" series ─────────────────────────────────────────────
+    // For each day in the window, count orders whose related Company.serviceDate
+    // falls on that day (regardless of when the order was placed). Also break
+    // those orders down by their createdAt day so the tooltip can show "this
+    // service-date doc was sold on these days."
+    const serviceRows = await prisma.order.findMany({
+      where: { company: { serviceDate: { gte: start, lt: end } } },
+      select: {
+        createdAt: true,
+        company: { select: { serviceDate: true } },
+      },
+    });
+
+    const serviceCount = new Map<string, number>();
+    const serviceBreakdown = new Map<string, Map<string, number>>();
+    for (const k of keys) {
+      serviceCount.set(k, 0);
+      serviceBreakdown.set(k, new Map());
+    }
+    for (const r of serviceRows) {
+      const sk = dayKey(r.company.serviceDate);
+      if (!serviceCount.has(sk)) continue;
+      serviceCount.set(sk, (serviceCount.get(sk) ?? 0) + 1);
+      const ok = dayKey(r.createdAt);
+      const inner = serviceBreakdown.get(sk)!;
+      inner.set(ok, (inner.get(ok) ?? 0) + 1);
+    }
+
+    return keys.map((k) => {
+      const inner = serviceBreakdown.get(k)!;
+      const breakdown = Array.from(inner.entries())
+        .map(([date, count]) => ({ date, count }))
+        .sort((a, b) => b.count - a.count || (a.date < b.date ? 1 : -1));
+      return {
+        date: k,
+        orders: orderCount.get(k) ?? 0,
+        revenueCents: revenueByDay.get(k) ?? 0,
+        serviceDayOrders: serviceCount.get(k) ?? 0,
+        serviceDayBreakdown: breakdown,
+      };
+    });
   })();
 
   function buildQuery(overrides: Record<string, string | number>) {

@@ -6,6 +6,7 @@ export interface DailyStat {
   date: string;         // YYYY-MM-DD
   sent: number;
   clicked: number;      // emails with >=1 click
+  opened: number;       // emails with >=1 open
   conversions: number;  // paid orders attributed to emails sent that day
 }
 
@@ -25,6 +26,7 @@ export function EmailRateChart({ data }: Props) {
       points.map((d) => ({
         ...d,
         clickRate: d.sent > 0 ? (d.clicked / d.sent) * 100 : 0,
+        openRate: d.sent > 0 ? (d.opened / d.sent) * 100 : 0,
         convRate: d.sent > 0 ? (d.conversions / d.sent) * 100 : 0,
       })),
     [points]
@@ -281,6 +283,15 @@ export function EmailRateChart({ data }: Props) {
             </div>
             <div className="flex items-center justify-between gap-2 py-0.5">
               <span className="inline-flex items-center gap-1.5 text-gray-600">
+                <span className="inline-block w-2 h-2 rounded-full bg-amber-500" />
+                Open rate
+              </span>
+              <span className="font-semibold text-gray-800">
+                {hovered.openRate.toFixed(1)}%
+              </span>
+            </div>
+            <div className="flex items-center justify-between gap-2 py-0.5">
+              <span className="inline-flex items-center gap-1.5 text-gray-600">
                 <span className="inline-block w-2 h-2 rounded-full bg-blue-500" />
                 Click rate
               </span>
@@ -298,8 +309,9 @@ export function EmailRateChart({ data }: Props) {
               </span>
             </div>
             <div className="mt-1 pt-1 border-t border-gray-100 text-gray-500">
-              {hovered.sent.toLocaleString()} sent · {hovered.clicked.toLocaleString()}{" "}
-              clicked · {hovered.conversions.toLocaleString()} conv.
+              {hovered.sent.toLocaleString()} sent · {hovered.opened.toLocaleString()}{" "}
+              opened · {hovered.clicked.toLocaleString()} clicked ·{" "}
+              {hovered.conversions.toLocaleString()} conv.
             </div>
           </div>
         )}

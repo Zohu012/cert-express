@@ -244,6 +244,7 @@ export default async function EmailHistoryPage({
       select: {
         sentAt: true,
         clickCount: true,
+        openCount: true,
         companyId: true,
       },
     });
@@ -251,9 +252,11 @@ export default async function EmailHistoryPage({
     // Per-day counters
     const sentBy = new Map<string, number>();
     const clickedBy = new Map<string, number>();
+    const openedBy = new Map<string, number>();
     for (const k of keys) {
       sentBy.set(k, 0);
       clickedBy.set(k, 0);
+      openedBy.set(k, 0);
     }
 
     // firstEmail[companyId] within the 30-day window
@@ -263,6 +266,9 @@ export default async function EmailHistoryPage({
       sentBy.set(k, (sentBy.get(k) ?? 0) + 1);
       if (log.clickCount > 0) {
         clickedBy.set(k, (clickedBy.get(k) ?? 0) + 1);
+      }
+      if (log.openCount > 0) {
+        openedBy.set(k, (openedBy.get(k) ?? 0) + 1);
       }
       const prev = firstEmail.get(log.companyId);
       if (!prev || log.sentAt < prev) firstEmail.set(log.companyId, log.sentAt);
@@ -293,6 +299,7 @@ export default async function EmailHistoryPage({
       date: k,
       sent: sentBy.get(k) ?? 0,
       clicked: clickedBy.get(k) ?? 0,
+      opened: openedBy.get(k) ?? 0,
       conversions: convBy.get(k) ?? 0,
     }));
   })();
