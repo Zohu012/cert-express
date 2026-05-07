@@ -555,6 +555,14 @@ export default async function EmailHistoryPage({
                     <span className="text-gray-400">
                       {sentDate.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}
                     </span>
+                    {log.reminderNumber === 2 && (
+                      <span
+                        className="ml-1 inline-flex items-center px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 text-[10px] font-semibold align-middle"
+                        title="2nd reminder"
+                      >
+                        R2
+                      </span>
+                    )}
                   </td>
                   <td className="px-3 py-2 text-gray-600 whitespace-nowrap text-xs">
                     {docDate ? docDate.toLocaleDateString("en-US") : "—"}

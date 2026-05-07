@@ -149,6 +149,39 @@ export function templateToHtml(
 </html>`;
 }
 
+export const DEFAULT_REMINDER2_TEMPLATE = `Hi {{companyName}} team,
+
+Just following up on the FMCSA {{documentType}} ({{documentNumber}}) for USDOT {{usdotNumber}} issued on {{serviceDate}}.
+
+We saw you took a look at our previous email — if you'd still like a PDF copy on file, you can grab one for {{price}}.
+
+This is a **paid third-party document service** and is not affiliated with FMCSA. You can verify your authority status directly through official FMCSA systems.
+
+---
+
+{{previewImageUrl}}
+
+{{paymentLink}}
+
+---
+
+Why companies keep a copy:
+• Quick reference for brokers and insurance
+• Internal recordkeeping
+• Forwardable PDF format
+
+What you'll receive:
+• PDF copy matching your FMCSA registration
+• Instant download after payment
+
+---
+
+Questions? Just reply to this email.
+
+Best regards,
+Ethan
+CertExpress`;
+
 export const DEFAULT_TEMPLATE = `Hi {{companyName}} team,
 
 We noticed that FMCSA issued your {{documentType}} ({{documentNumber}}) for USDOT {{usdotNumber}} on {{serviceDate}}.
@@ -196,6 +229,8 @@ export interface SendContext {
   source: SendSource;
   /** When true, excluded companies will be sent to AND stripped from the excluded list. */
   allowExcluded?: boolean;
+  /** 1 = first reminder (default). 2 = follow-up. */
+  reminderNumber?: 1 | 2;
 }
 
 export interface SendResult {
@@ -210,20 +245,22 @@ export async function sendOneCompany(
   company: Company,
   ctx: SendContext
 ): Promise<SendResult> {
+  const reminderNumber = ctx.reminderNumber ?? 1;
+
   // Validate email format
   if (!company.email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(company.email)) {
-    await logSkip(company, "invalid_email", ctx.source, company.email || "");
+    await logSkip(company, "invalid_email", ctx.source, company.email || "", reminderNumber);
     return { status: "skipped", skipReason: "invalid_email" };
   }
 
   if (company.emailStatus === "unsubscribed") {
-    await logSkip(company, "unsubscribed", ctx.source, company.email);
+    await logSkip(company, "unsubscribed", ctx.source, company.email, reminderNumber);
     return { status: "skipped", skipReason: "unsubscribed" };
   }
 
   const blocklist = new Set(await getUnsubscribeList());
   if (blocklist.has(company.email.trim().toLowerCase())) {
-    await logSkip(company, "blocklist", ctx.source, company.email);
+    await logSkip(company, "blocklist", ctx.source, company.email, reminderNumber);
     return { status: "skipped", skipReason: "blocklist" };
   }
 
@@ -232,17 +269,32 @@ export async function sendOneCompany(
     where: { companyId: company.id },
   });
   if (excluded && !ctx.allowExcluded) {
-    await logSkip(company, "excluded", ctx.source, company.email);
+    await logSkip(company, "excluded", ctx.source, company.email, reminderNumber);
     return { status: "skipped", skipReason: "excluded" };
   }
 
-  // Already sent check (belt-and-suspenders against race conditions)
-  if (company.emailStatus === "sent") {
-    await logSkip(company, "already_sent", ctx.source, company.email);
-    return { status: "skipped", skipReason: "already_sent" };
+  // Already sent check
+  if (reminderNumber === 1) {
+    // First reminder: company-level flag is the source of truth
+    if (company.emailStatus === "sent") {
+      await logSkip(company, "already_sent", ctx.source, company.email, reminderNumber);
+      return { status: "skipped", skipReason: "already_sent" };
+    }
+  } else {
+    // Reminder #2: check EmailLog directly
+    const prior = await prisma.emailLog.findFirst({
+      where: { companyId: company.id, reminderNumber: 2, status: "sent" },
+      select: { id: true },
+    });
+    if (prior) {
+      await logSkip(company, "already_sent", ctx.source, company.email, reminderNumber);
+      return { status: "skipped", skipReason: "already_sent" };
+    }
   }
 
-  const settings = await getSettings(["email_subject", "email_body_template"]);
+  const subjectKey = reminderNumber === 2 ? "email_subject_reminder2" : "email_subject";
+  const bodyKey = reminderNumber === 2 ? "email_body_template_reminder2" : "email_body_template";
+  const settings = await getSettings([subjectKey, bodyKey]);
   const priceCents = await getPriceCents();
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
 
@@ -256,6 +308,7 @@ export async function sendOneCompany(
         subject: "",
         status: "sent",
         source: ctx.source,
+        reminderNumber,
       },
     });
     emailLogId = emailLog.id;
@@ -291,15 +344,20 @@ export async function sendOneCompany(
         )
         .replace(/\{\{companyAddress\}\}/g, process.env.COMPANY_ADDRESS || "");
 
-    const subject = interpolate(
-      settings.email_subject ||
-        "PDF copy of your FMCSA {{documentType}} ({{documentNumber}}) — {{price}}"
-    );
+    const defaultSubject =
+      reminderNumber === 2
+        ? "Following up — your FMCSA {{documentType}} ({{documentNumber}})"
+        : "PDF copy of your FMCSA {{documentType}} ({{documentNumber}}) — {{price}}";
+    const subject = interpolate(settings[subjectKey] || defaultSubject);
 
-    const template = settings.email_body_template || DEFAULT_TEMPLATE;
+    const defaultTemplate =
+      reminderNumber === 2 ? DEFAULT_REMINDER2_TEMPLATE : DEFAULT_TEMPLATE;
+    const template = settings[bodyKey] || defaultTemplate;
     const textBody = interpolate(template);
     const preheader = interpolate(
-      "Paid third-party service. Convenience PDF copy for {{price}}. Not affiliated with FMCSA."
+      reminderNumber === 2
+        ? "Quick follow-up on your FMCSA {{documentType}}. Paid third-party PDF copy for {{price}}."
+        : "Paid third-party service. Convenience PDF copy for {{price}}. Not affiliated with FMCSA."
     );
     const unsubscribeUrl = `${appUrl}/unsubscribe?email=${encodeURIComponent(company.email!)}`;
     const htmlBody = templateToHtml(textBody, payUrl, trackingUrl, appUrl, openPixelUrl, preheader, unsubscribeUrl);
@@ -321,16 +379,24 @@ export async function sendOneCompany(
       isBulk: true,
     });
 
-    await prisma.$transaction([
-      prisma.emailLog.update({
+    if (reminderNumber === 1) {
+      await prisma.$transaction([
+        prisma.emailLog.update({
+          where: { id: emailLog.id },
+          data: { subject, status: "sent" },
+        }),
+        prisma.company.update({
+          where: { id: company.id },
+          data: { emailStatus: "sent", emailSentAt: new Date() },
+        }),
+      ]);
+    } else {
+      // Reminder #2: don't overwrite Company.emailSentAt — it tracks the 1st reminder.
+      await prisma.emailLog.update({
         where: { id: emailLog.id },
         data: { subject, status: "sent" },
-      }),
-      prisma.company.update({
-        where: { id: company.id },
-        data: { emailStatus: "sent", emailSentAt: new Date() },
-      }),
-    ]);
+      });
+    }
 
     // If send succeeded and company is in excluded list, remove it
     // (covers manual-send-overrides-exclusion case per spec)
@@ -349,10 +415,12 @@ export async function sendOneCompany(
           data: { status: "failed" },
         });
       }
-      await prisma.company.update({
-        where: { id: company.id },
-        data: { emailStatus: "failed" },
-      });
+      if (reminderNumber === 1) {
+        await prisma.company.update({
+          where: { id: company.id },
+          data: { emailStatus: "failed" },
+        });
+      }
     } catch (e) {
       console.error("Failed to mark failure state:", e);
     }
@@ -364,7 +432,8 @@ async function logSkip(
   company: Company,
   reason: SkipReason,
   source: SendSource,
-  toEmail: string
+  toEmail: string,
+  reminderNumber: number = 1
 ) {
   try {
     await prisma.emailLog.create({
@@ -375,6 +444,7 @@ async function logSkip(
         status: "skipped",
         skipReason: reason,
         source,
+        reminderNumber,
       },
     });
   } catch (e) {

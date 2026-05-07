@@ -328,6 +328,52 @@ export default function SettingsPage() {
             </p>
           </div>
 
+          <div className="border-t pt-4">
+            <label className="block text-sm font-semibold mb-1">
+              2nd Reminder Email
+            </label>
+            <p className="text-xs text-gray-500 mb-4">
+              Used by the{" "}
+              <a
+                href="/admin/emails/reminders"
+                target="_blank"
+                className="text-blue-600 hover:underline"
+              >
+                Reminders page
+              </a>{" "}
+              for follow-ups to companies that clicked the 1st reminder. Leave
+              blank to use the built-in default copy.
+            </p>
+
+            <div className="mb-4">
+              <label className="block text-sm font-medium mb-1">
+                2nd Reminder Subject Line
+              </label>
+              <Input
+                value={settings.email_subject_reminder2 || ""}
+                onChange={(e) => update("email_subject_reminder2", e.target.value)}
+                placeholder="Following up — your FMCSA {{documentType}} ({{documentNumber}})"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium mb-1">
+                2nd Reminder Body Template
+              </label>
+              <textarea
+                value={settings.email_body_template_reminder2 || ""}
+                onChange={(e) =>
+                  update("email_body_template_reminder2", e.target.value)
+                }
+                rows={8}
+                className="block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+              />
+              <p className="text-xs text-gray-400 mt-1">
+                Same variables as the 1st reminder body template above.
+              </p>
+            </div>
+          </div>
+
           {/* ── Legal Content ── */}
           <div className="border-t pt-4">
             <label className="block text-sm font-semibold mb-1">

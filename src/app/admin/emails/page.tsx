@@ -66,6 +66,12 @@ export default async function EmailsPage({
         <h1 className="text-2xl font-bold">Email Campaigns ({total.toLocaleString()})</h1>
         <div className="flex gap-2 flex-wrap">
           <Link
+            href="/admin/emails/reminders"
+            className="rounded-lg border border-gray-300 px-4 py-2 text-sm hover:bg-gray-50"
+          >
+            Reminders
+          </Link>
+          <Link
             href="/admin/emails/automation"
             className="rounded-lg border border-gray-300 px-4 py-2 text-sm hover:bg-gray-50"
           >

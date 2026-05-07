@@ -92,11 +92,13 @@ model EmailLog {
   status      String    @default("sent")   // "sent" | "failed" | "skipped"
   skipReason  String?                       // "excluded" | "already_sent" | "outside_date_range" | "blocklist" | "invalid_email" | "unsubscribed"
   source      String    @default("manual") // "manual" | "auto"
+  reminderNumber Int    @default(1)         // 1 = first reminder, 2 = follow-up
 
   @@index([companyId])
   @@index([sentAt])
   @@index([status])
   @@index([source])
+  @@index([companyId, reminderNumber])
 }
 
 model ExcludedCompany {
