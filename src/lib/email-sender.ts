@@ -273,6 +273,17 @@ export async function sendOneCompany(
     return { status: "skipped", skipReason: "excluded" };
   }
 
+  // Already-purchased check by USDOT # (covers buyers who used a different email
+  // or a different Company record sharing the same DOT).
+  const purchased = await prisma.order.findFirst({
+    where: { status: "completed", company: { usdotNumber: company.usdotNumber } },
+    select: { id: true },
+  });
+  if (purchased) {
+    await logSkip(company, "excluded", ctx.source, company.email, reminderNumber);
+    return { status: "skipped", skipReason: "excluded" };
+  }
+
   // Already sent check
   if (reminderNumber === 1) {
     // First reminder: company-level flag is the source of truth

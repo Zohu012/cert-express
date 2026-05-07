@@ -46,8 +46,9 @@ export async function fetchReminderCandidates(
   if (sameDayCompanies.length === 0) return [];
 
   const ids = sameDayCompanies.map((c) => c.id);
+  const dotNumbers = Array.from(new Set(sameDayCompanies.map((c) => c.usdotNumber)));
 
-  const [logs, excluded, blocklist] = await Promise.all([
+  const [logs, excluded, blocklist, purchasedOrders] = await Promise.all([
     prisma.emailLog.findMany({
       where: { companyId: { in: ids }, status: { in: ["sent", "skipped"] } },
       select: {
@@ -66,10 +67,20 @@ export async function fetchReminderCandidates(
           select: { companyId: true },
         }),
     getUnsubscribeList(),
+    // Completed orders matched by USDOT # — covers buyers who used a different
+    // email or a different Company record (same DOT, different documentNumber).
+    prisma.order.findMany({
+      where: {
+        status: "completed",
+        company: { usdotNumber: { in: dotNumbers } },
+      },
+      select: { company: { select: { usdotNumber: true } } },
+    }),
   ]);
 
   const excludedSet = new Set(excluded.map((e) => e.companyId));
   const blockSet = new Set(blocklist.map((e) => e.toLowerCase()));
+  const purchasedDotSet = new Set(purchasedOrders.map((o) => o.company.usdotNumber));
 
   // Aggregate per company.
   type Agg = {
@@ -97,6 +108,7 @@ export async function fetchReminderCandidates(
   const candidates: ReminderCandidate[] = [];
   for (const company of sameDayCompanies) {
     if (excludedSet.has(company.id)) continue;
+    if (purchasedDotSet.has(company.usdotNumber)) continue;
     const email = company.email?.trim().toLowerCase();
     if (!email || blockSet.has(email)) continue;
 
