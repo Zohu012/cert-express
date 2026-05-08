@@ -47,3 +47,7 @@ next-env.d.ts
 /prisma/dev.db-journal
 prisma/dev.db-wal
 prisma/dev.db-shm
+
+# local scraper (otrucking)
+/.chrome-profile/
+/.env.scrape

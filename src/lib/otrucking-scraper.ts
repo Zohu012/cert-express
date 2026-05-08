@@ -1,4 +1,5 @@
 import { parse as parseHTML } from "node-html-parser";
+import type { Page } from "playwright-core";
 import { prisma } from "@/lib/db";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
@@ -30,26 +31,14 @@ export interface OtruckingScrapeResult {
   equipmentTypes: string | null;
 }
 
-export interface ScrapeProgress {
-  running: boolean;
-  total: number;
-  completed: number;
-  success: number;
-  notFound: number;
-  errors: number;
-  current: string;
-}
+export type ScrapeStatus = "success" | "not_found" | "error";
 
-// Module-level progress tracker
-export const scrapeProgress: ScrapeProgress = {
-  running: false,
-  total: 0,
-  completed: 0,
-  success: 0,
-  notFound: 0,
-  errors: 0,
-  current: "",
-};
+export interface ScrapeOutcome {
+  status: ScrapeStatus;
+  data?: OtruckingScrapeResult;
+  error?: string;
+  url: string;
+}
 
 // ─── URL helpers ────────────────────────────────────────────────────────────
 
@@ -65,38 +54,59 @@ export function buildOtruckingUrl(companyName: string, dotNumber: string): strin
   return `https://otrucking.com/carrier/${slugify(companyName)}-dot-${dotNumber}/`;
 }
 
-// ─── Fetch ──────────────────────────────────────────────────────────────────
+// ─── Cloudflare detection / wait ────────────────────────────────────────────
 
-async function fetchPage(url: string): Promise<{ status: number; html: string } | null> {
+const CLOUDFLARE_TITLE_RE = /just a moment|verifying|checking your browser|attention required/i;
+const CLOUDFLARE_BODY_MARKERS = [
+  "challenge-platform",
+  "cf_chl_opt",
+  "cf-chl-bypass",
+  "Just a moment",
+  "Verifying you are human",
+];
+
+function looksLikeCloudflareChallenge(html: string): boolean {
+  return CLOUDFLARE_BODY_MARKERS.some((m) => html.includes(m));
+}
+
+async function waitForCloudflare(page: Page, timeoutMs = 60_000): Promise<void> {
+  const start = Date.now();
+  while (Date.now() - start < timeoutMs) {
+    let title = "";
+    try {
+      title = await page.title();
+    } catch {
+      return;
+    }
+    if (!CLOUDFLARE_TITLE_RE.test(title)) return;
+    await page.waitForTimeout(2000);
+  }
+}
+
+// ─── Browser fetch ──────────────────────────────────────────────────────────
+
+export async function fetchPageWithBrowser(
+  page: Page,
+  url: string
+): Promise<{ status: number; html: string } | null> {
   try {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 15_000);
-    const res = await fetch(url, {
-      headers: {
-        "User-Agent":
-          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        Accept: "text/html,application/xhtml+xml",
-      },
-      redirect: "follow",
-      signal: controller.signal,
-    });
-    clearTimeout(timeout);
-    const html = await res.text();
-    return { status: res.status, html };
+    const response = await page.goto(url, { waitUntil: "domcontentloaded", timeout: 30_000 });
+    await waitForCloudflare(page, 60_000);
+    const html = await page.content();
+    const status = response?.status() ?? 200;
+    return { status, html };
   } catch {
     return null;
   }
 }
 
-// ─── Parser ─────────────────────────────────────────────────────────────────
+// ─── Parser (unchanged from previous fetch-based version) ───────────────────
 
 function textAfterLabel(root: ReturnType<typeof parseHTML>, label: string): string | null {
-  // Find elements containing the label text, then grab the next sibling's text
   const allEls = root.querySelectorAll("*");
   for (const el of allEls) {
     const text = el.text.trim();
     if (text === label && el.childNodes.length <= 1) {
-      // Check next sibling element
       const parent = el.parentNode;
       if (!parent) continue;
       const siblings = parent.childNodes;
@@ -141,7 +151,6 @@ export function parseCarrierPage(html: string): OtruckingScrapeResult {
 
   const root = parseHTML(html);
 
-  // 1. Extract JSON-LD Organization data
   const scripts = root.querySelectorAll('script[type="application/ld+json"]');
   for (const script of scripts) {
     try {
@@ -164,7 +173,6 @@ export function parseCarrierPage(html: string): OtruckingScrapeResult {
     }
   }
 
-  // 2. Extract email from mailto: link
   const mailtoLinks = root.querySelectorAll('a[href^="mailto:"]');
   for (const link of mailtoLinks) {
     const href = link.getAttribute("href") || "";
@@ -175,7 +183,6 @@ export function parseCarrierPage(html: string): OtruckingScrapeResult {
     }
   }
 
-  // 3. Extract labeled fields from DOM
   result.companyOfficer = textAfterLabel(root, "Company Officer");
   result.dotStatus = textAfterLabel(root, "Status") || textAfterLabel(root, "DOT Status");
   result.authoritySince = textAfterLabel(root, "Authority Since");
@@ -186,28 +193,22 @@ export function parseCarrierPage(html: string): OtruckingScrapeResult {
   result.mcs150Update = textAfterLabel(root, "MCS-150 Update");
   result.county = textAfterLabel(root, "County");
 
-  // 4. Entity type from hero badge area (e.g., "Carrier & Broker")
-  // Look for status badges near the company name
   const heroText = root.text;
   const entityMatch = heroText.match(/(?:Carrier\s*&\s*Broker|Carrier|Broker)/);
   if (entityMatch) result.entityType = entityMatch[0];
 
-  // 5. Power units from hero area
   const powerMatch = heroText.match(/([\d,]+)\s*Power\s*Units/i);
   if (powerMatch) result.powerUnits = powerMatch[1].replace(/,/g, "");
 
-  // Est year
   const estMatch = heroText.match(/Est\.\s*(\d{4}(?:\s*\([^)]+\))?)/i);
   if (estMatch) result.estYear = estMatch[1];
 
-  // Authority status
   const authStatusMatch = heroText.match(/Authority\s+Status[:\s]*(\w+)/i);
   if (authStatusMatch) result.authorityStatus = authStatusMatch[1];
   if (!result.authorityStatus && result.dotStatus) {
     result.authorityStatus = result.dotStatus;
   }
 
-  // 6. Fleet breakdown from table
   const tables = root.querySelectorAll("table");
   for (const table of tables) {
     const headers = table.querySelectorAll("th").map((th) => th.text.trim().toLowerCase());
@@ -235,7 +236,6 @@ export function parseCarrierPage(html: string): OtruckingScrapeResult {
     }
   }
 
-  // 7. Cargo types - look for badges/pills after "Authorized Cargo Types"
   const cargoSection = html.match(/Authorized Cargo Types[\s\S]*?(?=<(?:h[2-6]|section|div class="[^"]*(?:mt-|mb-|pt-|pb-)[^"]*"))/i);
   if (cargoSection) {
     const cargoRoot = parseHTML(cargoSection[0]);
@@ -246,7 +246,6 @@ export function parseCarrierPage(html: string): OtruckingScrapeResult {
     if (types.length > 0) result.cargoTypes = JSON.stringify(types);
   }
 
-  // 8. Equipment types
   const equipSection = html.match(/Equipment Analysis[\s\S]*?(?=<(?:h[2-6]|section|div class="[^"]*(?:mt-|mb-|pt-|pb-)[^"]*"))/i);
   if (equipSection) {
     const equipRoot = parseHTML(equipSection[0]);
@@ -263,20 +262,24 @@ export function parseCarrierPage(html: string): OtruckingScrapeResult {
 // ─── Scrape single company ──────────────────────────────────────────────────
 
 export async function scrapeCompany(
+  page: Page,
   companyName: string,
   dotNumber: string
-): Promise<{ status: "success" | "not_found" | "error"; data?: OtruckingScrapeResult; error?: string; url: string }> {
+): Promise<ScrapeOutcome> {
   const url = buildOtruckingUrl(companyName, dotNumber);
 
-  const response = await fetchPage(url);
+  const response = await fetchPageWithBrowser(page, url);
   if (!response) {
-    return { status: "error", error: "Failed to fetch page (timeout or network error)", url };
+    return { status: "error", error: "Failed to load page (timeout or navigation error)", url };
   }
   if (response.status === 404) {
     return { status: "not_found", url };
   }
   if (response.status !== 200) {
     return { status: "error", error: `HTTP ${response.status}`, url };
+  }
+  if (looksLikeCloudflareChallenge(response.html)) {
+    return { status: "error", error: "cloudflare_blocked", url };
   }
 
   try {
@@ -289,79 +292,122 @@ export async function scrapeCompany(
 
 // ─── Batch scrape ───────────────────────────────────────────────────────────
 
-const DELAY_MS = 1500;
+const DELAY_MS = 3000;
 const RESCRAPE_DAYS = 7;
 
 function sleep(ms: number) {
   return new Promise((r) => setTimeout(r, ms));
 }
 
-export async function scrapeAllCompanies(): Promise<void> {
-  if (scrapeProgress.running) return;
+export interface BatchProgress {
+  total: number;
+  completed: number;
+  success: number;
+  notFound: number;
+  errors: number;
+  current: string;
+}
 
-  scrapeProgress.running = true;
-  scrapeProgress.completed = 0;
-  scrapeProgress.success = 0;
-  scrapeProgress.notFound = 0;
-  scrapeProgress.errors = 0;
-  scrapeProgress.current = "";
+export async function scrapeAllCompanies(
+  page: Page,
+  opts: { limit?: number; onProgress?: (p: BatchProgress) => void } = {}
+): Promise<BatchProgress> {
+  const progress: BatchProgress = {
+    total: 0,
+    completed: 0,
+    success: 0,
+    notFound: 0,
+    errors: 0,
+    current: "",
+  };
 
-  try {
-    // Get distinct USDOT numbers with a representative company name
-    const companies = await prisma.$queryRawUnsafe<
-      { usdotNumber: string; companyName: string }[]
-    >(
-      `SELECT DISTINCT c."usdotNumber", c."companyName"
-       FROM "Company" c
-       ORDER BY c."usdotNumber"`
-    );
+  const companies = await prisma.$queryRawUnsafe<
+    { usdotNumber: string; companyName: string }[]
+  >(
+    `SELECT DISTINCT c."usdotNumber", c."companyName"
+     FROM "Company" c
+     ORDER BY c."usdotNumber"`
+  );
 
-    // Filter out recently scraped
-    const cutoff = new Date(Date.now() - RESCRAPE_DAYS * 24 * 60 * 60 * 1000);
-    const existing = await prisma.otruckingCompany.findMany({
-      where: { scrapeStatus: "success", scrapedAt: { gte: cutoff } },
-      select: { usdotNumber: true },
-    });
-    const recentlyScraped = new Set(existing.map((e) => e.usdotNumber));
+  const cutoff = new Date(Date.now() - RESCRAPE_DAYS * 24 * 60 * 60 * 1000);
+  const existing = await prisma.otruckingCompany.findMany({
+    where: { scrapeStatus: "success", scrapedAt: { gte: cutoff } },
+    select: { usdotNumber: true },
+  });
+  const recentlyScraped = new Set(existing.map((e) => e.usdotNumber));
 
-    const toScrape = companies.filter((c) => !recentlyScraped.has(c.usdotNumber));
-    scrapeProgress.total = toScrape.length;
+  let toScrape = companies.filter((c) => !recentlyScraped.has(c.usdotNumber));
+  if (opts.limit && opts.limit > 0) toScrape = toScrape.slice(0, opts.limit);
+  progress.total = toScrape.length;
+  opts.onProgress?.(progress);
 
-    for (const company of toScrape) {
-      scrapeProgress.current = company.companyName;
+  for (const company of toScrape) {
+    progress.current = company.companyName;
+    opts.onProgress?.(progress);
 
-      const result = await scrapeCompany(company.companyName, company.usdotNumber);
+    const result = await scrapeCompany(page, company.companyName, company.usdotNumber);
+
+    if (result.status === "success" && result.data) {
+      // Only overwrite fields that came back non-null. Preserves previously
+      // scraped values when the new parse is partial.
+      const nonNull: Partial<OtruckingScrapeResult> = {};
+      for (const [k, v] of Object.entries(result.data) as [
+        keyof OtruckingScrapeResult,
+        string | null
+      ][]) {
+        if (v != null && v !== "") (nonNull as Record<string, string>)[k] = v;
+      }
 
       await prisma.otruckingCompany.upsert({
         where: { usdotNumber: company.usdotNumber },
         create: {
           usdotNumber: company.usdotNumber,
           sourceUrl: result.url,
-          ...(result.data || {}),
-          scrapeStatus: result.status,
-          scrapeError: result.error || null,
-          scrapedAt: result.status === "success" ? new Date() : null,
+          ...result.data,
+          scrapeStatus: "success",
+          scrapeError: null,
+          scrapedAt: new Date(),
         },
         update: {
           sourceUrl: result.url,
-          ...(result.data || {}),
-          scrapeStatus: result.status,
-          scrapeError: result.error || null,
-          scrapedAt: result.status === "success" ? new Date() : null,
+          ...nonNull,
+          scrapeStatus: "success",
+          scrapeError: null,
+          scrapedAt: new Date(),
         },
       });
-
-      scrapeProgress.completed++;
-      if (result.status === "success") scrapeProgress.success++;
-      else if (result.status === "not_found") scrapeProgress.notFound++;
-      else scrapeProgress.errors++;
-
-      if (scrapeProgress.completed < toScrape.length) {
-        await sleep(DELAY_MS);
-      }
+    } else {
+      // not_found / error: never wipe previously scraped data or scrapedAt.
+      // Only record the new status + error reason.
+      await prisma.otruckingCompany.upsert({
+        where: { usdotNumber: company.usdotNumber },
+        create: {
+          usdotNumber: company.usdotNumber,
+          sourceUrl: result.url,
+          scrapeStatus: result.status,
+          scrapeError: result.error || null,
+          scrapedAt: null,
+        },
+        update: {
+          sourceUrl: result.url,
+          scrapeStatus: result.status,
+          scrapeError: result.error || null,
+        },
+      });
     }
-  } finally {
-    scrapeProgress.running = false;
-    scrapeProgress.current = "";
+
+    progress.completed++;
+    if (result.status === "success") progress.success++;
+    else if (result.status === "not_found") progress.notFound++;
+    else progress.errors++;
+    opts.onProgress?.(progress);
+
+    if (progress.completed < toScrape.length) {
+      await sleep(DELAY_MS);
+    }
   }
+
+  progress.current = "";
+  opts.onProgress?.(progress);
+  return progress;
 }
