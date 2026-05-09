@@ -57,30 +57,23 @@ export function buildOtruckingUrl(companyName: string, dotNumber: string): strin
 // ─── Cloudflare detection / wait ────────────────────────────────────────────
 
 const CLOUDFLARE_TITLE_RE = /just a moment|verifying|checking your browser|attention required/i;
-const CLOUDFLARE_BODY_MARKERS = [
-  "challenge-platform",
-  "cf_chl_opt",
-  "cf-chl-bypass",
-  "Just a moment",
-  "Verifying you are human",
-];
 
-function looksLikeCloudflareChallenge(html: string): boolean {
-  return CLOUDFLARE_BODY_MARKERS.some((m) => html.includes(m));
-}
-
-async function waitForCloudflare(page: Page, timeoutMs = 60_000): Promise<void> {
+async function waitForCloudflare(
+  page: Page,
+  timeoutMs = 60_000
+): Promise<{ stillBlocked: boolean; finalTitle: string }> {
   const start = Date.now();
+  let title = "";
   while (Date.now() - start < timeoutMs) {
-    let title = "";
     try {
       title = await page.title();
     } catch {
-      return;
+      return { stillBlocked: false, finalTitle: "" };
     }
-    if (!CLOUDFLARE_TITLE_RE.test(title)) return;
+    if (!CLOUDFLARE_TITLE_RE.test(title)) return { stillBlocked: false, finalTitle: title };
     await page.waitForTimeout(2000);
   }
+  return { stillBlocked: true, finalTitle: title };
 }
 
 // ─── Browser fetch ──────────────────────────────────────────────────────────
@@ -88,13 +81,13 @@ async function waitForCloudflare(page: Page, timeoutMs = 60_000): Promise<void> 
 export async function fetchPageWithBrowser(
   page: Page,
   url: string
-): Promise<{ status: number; html: string } | null> {
+): Promise<{ status: number; html: string; cloudflareBlocked: boolean } | null> {
   try {
     const response = await page.goto(url, { waitUntil: "domcontentloaded", timeout: 30_000 });
-    await waitForCloudflare(page, 60_000);
+    const { stillBlocked } = await waitForCloudflare(page, 60_000);
     const html = await page.content();
     const status = response?.status() ?? 200;
-    return { status, html };
+    return { status, html, cloudflareBlocked: stillBlocked };
   } catch {
     return null;
   }
@@ -272,14 +265,14 @@ export async function scrapeCompany(
   if (!response) {
     return { status: "error", error: "Failed to load page (timeout or navigation error)", url };
   }
+  if (response.cloudflareBlocked) {
+    return { status: "error", error: "cloudflare_blocked", url };
+  }
   if (response.status === 404) {
     return { status: "not_found", url };
   }
   if (response.status !== 200) {
     return { status: "error", error: `HTTP ${response.status}`, url };
-  }
-  if (looksLikeCloudflareChallenge(response.html)) {
-    return { status: "error", error: "cloudflare_blocked", url };
   }
 
   try {

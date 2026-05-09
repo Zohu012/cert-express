@@ -109,6 +109,13 @@ async function runPushMode(page: Page) {
     process.stdout.write(
       `\r[${completed}/${pending.length}] ${pct}% — ${success} ok · ${notFound} 404 · ${errors} err — ${company.companyName.slice(0, 40)}`.padEnd(120) + "\r"
     );
+    if (outcome.status === "error") {
+      console.log(
+        `\n  [err] ${company.companyName} (DOT ${company.usdotNumber}) — ${outcome.error ?? "unknown"} — ${outcome.url}`
+      );
+    } else if (outcome.status === "not_found") {
+      console.log(`\n  [404] ${company.companyName} — ${outcome.url}`);
+    }
 
     if (completed < pending.length) await sleep(DELAY_MS);
   }
