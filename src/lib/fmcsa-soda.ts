@@ -224,13 +224,15 @@ interface PageOpts {
   limit?: number;
   /** Stop after N rows total. */
   maxRows?: number;
+  /** Start pagination at this row offset (for resuming interrupted loads). */
+  startOffset?: number;
   /** Called after each page so callers can log progress. */
   onPage?: (info: { fetched: number; offset: number; pageRows: number }) => void;
 }
 
 async function* paginate(opts: PageOpts = {}): AsyncIterable<SodaRow> {
   const limit = opts.limit ?? PAGE_SIZE;
-  let offset = 0;
+  let offset = opts.startOffset ?? 0;
   let fetched = 0;
   while (true) {
     const params = new URLSearchParams({
@@ -256,9 +258,10 @@ async function* paginate(opts: PageOpts = {}): AsyncIterable<SodaRow> {
 
 export async function* fetchAllCarriers(opts: {
   maxRows?: number;
+  startOffset?: number;
   onPage?: PageOpts["onPage"];
 } = {}): AsyncIterable<FmcsaMapped> {
-  for await (const row of paginate({ maxRows: opts.maxRows, onPage: opts.onPage })) {
+  for await (const row of paginate({ maxRows: opts.maxRows, startOffset: opts.startOffset, onPage: opts.onPage })) {
     const mapped = mapFmcsaRow(row);
     if (mapped) yield mapped;
   }

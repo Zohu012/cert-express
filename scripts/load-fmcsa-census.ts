@@ -21,7 +21,9 @@ if (fs.existsSync(SCRAPE_ENV)) {
 
 const args = process.argv.slice(2);
 const limitArg = args.find((a) => a.startsWith("--limit="));
+const offsetArg = args.find((a) => a.startsWith("--offset="));
 const LIMIT = limitArg ? Number(limitArg.split("=")[1]) : undefined;
+const START_OFFSET = offsetArg ? Number(offsetArg.split("=")[1]) : undefined;
 const DRY_RUN = args.includes("--dry-run");
 const BATCH_SIZE = 1000;
 const SYNC_KEY = "fmcsa_census";
@@ -58,7 +60,7 @@ async function main() {
   }
 
   console.log(
-    `[load] mode=${DRY_RUN ? "DRY RUN" : "DB UPSERT"} limit=${LIMIT ?? "(none)"} batch=${BATCH_SIZE}`
+    `[load] mode=${DRY_RUN ? "DRY RUN" : "DB UPSERT"} limit=${LIMIT ?? "(none)"} offset=${START_OFFSET ?? 0} batch=${BATCH_SIZE}`
   );
 
   let total = 0;
@@ -68,6 +70,7 @@ async function main() {
 
   for await (const mapped of fetchAllCarriers({
     maxRows: LIMIT,
+    startOffset: START_OFFSET,
     onPage: ({ pageRows, offset }) => {
       console.log(`[load] page fetched offset=${offset} rows=${pageRows}`);
     },
