@@ -23,8 +23,16 @@ export default async function CompaniesIndex({
   const pageNum = Math.max(1, parseInt(sp.page || "1", 10) || 1);
   const q = (sp.q || "").trim();
 
+  // Only show carriers that have a certificate in the Company table.
+  const certifiedDots = await prisma.company.findMany({
+    select: { usdotNumber: true },
+    distinct: ["usdotNumber"],
+  });
+  const dotNumbers = certifiedDots.map((c) => c.usdotNumber);
+
   const where = {
     scrapeStatus: "success" as const,
+    usdotNumber: { in: dotNumbers },
     ...(q ? { companyName: { contains: q } } : {}),
   };
 
