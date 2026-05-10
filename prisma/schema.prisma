@@ -173,3 +173,10 @@ model OtruckingCompany {
   @@index([scrapeStatus])
   @@index([email])
 }
+
+model SyncState {
+  key           String   @id
+  lastRunAt     DateTime
+  lastWatermark String?
+  updatedAt     DateTime @updatedAt
+}

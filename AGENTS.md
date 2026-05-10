@@ -4,16 +4,15 @@
 This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` before writing any code. Heed deprecation notices.
 <!-- END:nextjs-agent-rules -->
 
-## Otrucking scraper (local-only)
+## Carrier data: FMCSA Company Census File (SODA API)
 
-`otrucking.com` is behind Cloudflare bot protection. The scraper cannot run from the production Next.js server. Instead, run it locally on the operator's laptop — it connects to a real Chrome over CDP and writes directly to the production Postgres.
+`OtruckingCompany` is now populated from the FMCSA Company Census File on `data.transportation.gov` (Socrata dataset `az4n-8mr2`, ~4.4M carriers, no auth, no Cloudflare). The previous `otrucking.com` scraper has been retired.
 
 Operator workflow:
 
-1. `scripts/open_chrome.bat` — launches Chrome with `--remote-debugging-port=9222` and a persistent profile at `cert-express/.chrome-profile/`.
-2. In that Chrome window, visit any otrucking.com carrier page once and pass the Cloudflare check. Cookies are saved into the profile dir.
-3. Copy `.env.scrape.example` to `.env.scrape` and set `DATABASE_URL` to the production Postgres connection string. Optionally set `SCRAPE_LIMIT=3` for a smoke test.
-4. `npm run scrape:otrucking` — the CLI connects to Chrome, scrapes pending/stale rows, and upserts into `OtruckingCompany`.
-5. Refresh `https://www.certexpresss.com/admin/otrucking-companies`.
+1. Copy `.env.scrape.example` to `.env.scrape` and set `DATABASE_URL`. Optionally set `SOCRATA_APP_TOKEN` for higher rate limits.
+2. **One-time bulk load:** `npm run load:fmcsa` — paginates the full census, upserts every carrier into `OtruckingCompany`, records the watermark in `SyncState`. Smoke test first with `npm run load:fmcsa -- --limit=10` or `--dry-run`.
+3. **Daily delta:** `npm run sync:fmcsa` — pulls only carriers whose `mcs150_date` is at or after the last watermark (with a 1-day overlap for safety) and upserts. Wire to cron / Task Scheduler / Vercel Cron.
+4. **Per-DOT refresh:** `npm run scrape:otrucking` — iterates pending DOTs (push mode pulls from `/api/admin/otrucking/sync/pending`; local mode reads the `Company` table directly) and refreshes each via `fetchCarrierByDot`.
 
-The in-app `POST /api/admin/otrucking/scrape` endpoint now returns 501 with this instruction. The status endpoint reads last-scrape stats from the DB.
+Field mapping is in `src/lib/fmcsa-soda.ts`. `safetyRating` and `authoritySince` are not in this dataset and remain null. `email_address`, `cargoTypes` (aggregated from `crgo_*` columns), `companyOfficer`, and all status/operations fields come straight from the API.

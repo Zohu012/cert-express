@@ -7,7 +7,9 @@
     "build": "prisma generate && next build",
     "start": "next start",
     "lint": "eslint",
-    "scrape:otrucking": "tsx scripts/scrape-otrucking.ts"
+    "scrape:otrucking": "tsx scripts/scrape-otrucking.ts",
+    "load:fmcsa": "tsx scripts/load-fmcsa-census.ts",
+    "sync:fmcsa": "tsx scripts/sync-fmcsa-daily.ts"
   },
   "dependencies": {
     "@paypal/react-paypal-js": "^9.1.1",
@@ -35,7 +37,6 @@
     "dotenv": "^17.0.0",
     "eslint": "^9",
     "eslint-config-next": "16.2.3",
-    "playwright-core": "^1.48.0",
     "prisma": "^6.19.3",
     "tailwindcss": "^4",
     "tsx": "^4.19.0",

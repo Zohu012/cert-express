@@ -26,14 +26,15 @@ export async function POST() {
 
   const cwd = process.cwd();
   const isWindows = process.platform === "win32";
-  const cmd = isWindows ? "npm.cmd" : "npm";
 
   try {
-    const child = spawn(cmd, ["run", "scrape:otrucking"], {
+    const child = spawn("npm", ["run", "scrape:otrucking"], {
       cwd,
       detached: !isWindows,
       stdio: "ignore",
       env: process.env,
+      // Required on Windows since Node 20+ to spawn .cmd/.bat shims like npm.cmd.
+      shell: isWindows,
     });
     if (!isWindows) child.unref();
 
