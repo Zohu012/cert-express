@@ -58,38 +58,73 @@ function joinNonEmpty(parts: (string | null)[], sep = "; "): string | null {
 
 // FMCSA cargo classification fields are individual `crgo_*` columns set to "X" when applicable.
 // Aggregate every such column into a JSON object of { humanLabel: true }.
+// Cargo label map: FMCSA crgo_* column suffix → human-readable label
+const CARGO_LABELS: Record<string, string> = {
+  genfreight: "General Freight",
+  household: "Household Goods",
+  metal: "Metal: Sheets, Coils, Rolls",
+  motorveh: "Motor Vehicles",
+  driveaway: "Drive/Tow Away",
+  logpole: "Logs, Poles, Beams, Lumber",
+  building: "Building Materials",
+  mobilehome: "Mobile Homes",
+  machlarge: "Machinery, Large Objects",
+  oilfield: "Oilfield Equipment",
+  livestock: "Livestock",
+  grainfeed: "Grain, Feed, Hay",
+  coalcoke: "Coal/Coke",
+  meat: "Meat",
+  garbage: "Garbage/Refuse",
+  usmail: "U.S. Mail",
+  chemicals: "Chemicals",
+  commdryblk: "Commodities Dry Bulk",
+  refrigfood: "Refrigerated Food",
+  beverages: "Beverages",
+  paperprod: "Paper Products",
+  utilities: "Utilities",
+  farmsupply: "Farm Supplies",
+  construction: "Construction",
+  waterwell: "Water Well",
+  cargoothr: "Other",
+  intermodal: "Intermodal Containers",
+  passengers: "Passengers",
+  charter: "Charter/Tour",
+  schoolbus: "School Bus",
+  religion: "Religious Organization",
+  urbantrans: "Urban/Mass Transit",
+  migrant: "Migrant",
+  usgovcargo: "U.S. Government",
+};
+
 function buildCargoTypes(row: SodaRow): string | null {
-  const cargo: Record<string, true> = {};
+  const labels: string[] = [];
   for (const [key, raw] of Object.entries(row)) {
     if (!key.startsWith("crgo_")) continue;
     if (String(raw).trim().toUpperCase() !== "X") continue;
-    const label = key
-      .replace(/^crgo_/, "")
-      .replace(/_/g, " ")
-      .replace(/\b\w/g, (c) => c.toUpperCase());
-    cargo[label] = true;
+    const suffix = key.replace(/^crgo_/, "");
+    labels.push(CARGO_LABELS[suffix] ?? suffix.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()));
   }
-  return Object.keys(cargo).length === 0 ? null : JSON.stringify(cargo);
+  return labels.length === 0 ? null : JSON.stringify(labels);
 }
 
 function buildFleetBreakdown(row: SodaRow): string | null {
-  const fleet = {
+  const obj = {
     truckUnits: val(row, "truck_units"),
     powerUnits: val(row, "power_units"),
     busUnits: val(row, "bus_units"),
     ownedTractors: val(row, "owntract"),
   };
-  const hasAny = Object.values(fleet).some((v) => v != null);
-  return hasAny ? JSON.stringify(fleet) : null;
+  const hasAny = Object.values(obj).some((v) => v != null);
+  return hasAny ? JSON.stringify(obj) : null;
 }
 
 function buildEquipmentTypes(row: SodaRow): string | null {
-  const eq = {
-    truckUnits: val(row, "truck_units"),
-    ownedTractors: val(row, "owntract"),
-  };
-  const hasAny = Object.values(eq).some((v) => v != null);
-  return hasAny ? JSON.stringify(eq) : null;
+  const types: string[] = [];
+  const trucks = val(row, "truck_units");
+  const owned = val(row, "owntract");
+  if (trucks && trucks !== "0") types.push(`${trucks} Truck(s)`);
+  if (owned && owned !== "0") types.push(`${owned} Owned Tractor(s)`);
+  return types.length === 0 ? null : JSON.stringify(types);
 }
 
 function statusCodeToLabel(code: string | null): string | null {
