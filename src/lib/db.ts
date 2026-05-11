@@ -39,7 +39,8 @@ if (!globalForPrisma.prismaInit) {
     }
     try {
       // 512 MB mmap — lets SQLite read indexes via page cache instead of read() syscalls.
-      await prisma.$executeRawUnsafe("PRAGMA mmap_size = 536870912");
+      // Uses $queryRawUnsafe because mmap_size returns a result row.
+      await prisma.$queryRawUnsafe("PRAGMA mmap_size = 536870912");
     } catch (e) {
       console.error("[prisma] PRAGMA mmap_size failed:", e);
     }
