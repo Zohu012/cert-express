@@ -23,28 +23,32 @@ export default async function CompaniesIndex({
   const pageNum = Math.max(1, parseInt(sp.page || "1", 10) || 1);
   const q = (sp.q || "").trim();
 
-  // Only show carriers that have a certificate in the Company table.
-  const certifiedDots = await prisma.company.findMany({
-    select: { usdotNumber: true },
-    distinct: ["usdotNumber"],
-  });
-  const dotNumbers = certifiedDots.map((c) => c.usdotNumber);
+  const offset = (pageNum - 1) * PAGE_SIZE;
+  const searchFilter = q ? `AND o."companyName" LIKE '%' || ? || '%'` : "";
+  const params = q ? [q, PAGE_SIZE, offset] : [PAGE_SIZE, offset];
+  const countParams = q ? [q] : [];
 
-  const where = {
-    scrapeStatus: "success" as const,
-    usdotNumber: { in: dotNumbers },
-    ...(q ? { companyName: { contains: q } } : {}),
-  };
-
-  const [total, rows] = await Promise.all([
-    prisma.otruckingCompany.count({ where }),
-    prisma.otruckingCompany.findMany({
-      where,
-      orderBy: { companyName: "asc" },
-      skip: (pageNum - 1) * PAGE_SIZE,
-      take: PAGE_SIZE,
-    }),
+  const [countResult, rows] = await Promise.all([
+    prisma.$queryRawUnsafe<{ total: number }[]>(
+      `SELECT count(*) as total FROM "OtruckingCompany" o
+       WHERE o."scrapeStatus" = 'success'
+       AND EXISTS (SELECT 1 FROM "Company" c WHERE c."usdotNumber" = o."usdotNumber")
+       ${searchFilter}`,
+      ...countParams
+    ),
+    prisma.$queryRawUnsafe<{ id: string; usdotNumber: string; companyName: string | null; city: string | null; state: string | null; entityType: string | null; powerUnits: string | null; authorityStatus: string | null }[]>(
+      `SELECT o."id", o."usdotNumber", o."companyName", o."city", o."state", o."entityType", o."powerUnits", o."authorityStatus"
+       FROM "OtruckingCompany" o
+       WHERE o."scrapeStatus" = 'success'
+       AND EXISTS (SELECT 1 FROM "Company" c WHERE c."usdotNumber" = o."usdotNumber")
+       ${searchFilter}
+       ORDER BY o."companyName" ASC
+       LIMIT ? OFFSET ?`,
+      ...params
+    ),
   ]);
+
+  const total = Number(countResult[0]?.total ?? 0);
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
