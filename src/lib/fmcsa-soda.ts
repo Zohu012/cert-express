@@ -217,6 +217,35 @@ export async function fetchCarrierByDot(dotNumber: string): Promise<FmcsaMapped 
   return mapFmcsaRow(rows[0]);
 }
 
+/**
+ * Bulk lookup by a list of DOT numbers. Uses a single `dot_number IN (...)` SODA
+ * query per chunk of 100, so a 400-DOT PDF refresh becomes ~4 HTTP requests
+ * instead of 400. Returns a Map keyed by DOT number.
+ */
+export async function fetchCarriersByDots(
+  dotNumbers: string[]
+): Promise<Map<string, FmcsaMapped>> {
+  const out = new Map<string, FmcsaMapped>();
+  const unique = Array.from(new Set(dotNumbers.filter(Boolean)));
+  const CHUNK = 100;
+  for (let i = 0; i < unique.length; i += CHUNK) {
+    const chunk = unique.slice(i, i + CHUNK);
+    const inClause = chunk.map((d) => Number(d)).filter((n) => Number.isFinite(n)).join(",");
+    if (!inClause) continue;
+    const rows = await sodaGet(
+      new URLSearchParams({
+        $where: `dot_number IN (${inClause})`,
+        $limit: String(CHUNK),
+      })
+    );
+    for (const row of rows) {
+      const mapped = mapFmcsaRow(row);
+      if (mapped) out.set(mapped.usdotNumber, mapped);
+    }
+  }
+  return out;
+}
+
 interface PageOpts {
   /** Optional SoQL WHERE clause (without the leading `$where=`). */
   where?: string;

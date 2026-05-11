@@ -3,6 +3,7 @@ import { createInterface } from "readline";
 import path from "path";
 import { prisma } from "./db";
 import { generateDocuments } from "./document-generator";
+import { runPostPdfPipeline } from "./post-pdf-pipeline";
 import type { ParsedCompany } from "@/types";
 
 const PYTHON_PATH = process.env.PYTHON_PATH || "python";
@@ -82,6 +83,17 @@ export async function processPdf(sourcePdfId: string, filePath: string) {
     });
 
     console.log(`[PDF Processor] Done. ${companyCount} companies saved.`);
+
+    // Fire-and-forget: refresh OtruckingCompany rows for every DOT in this PDF
+    // (per-DOT lookup against FMCSA SODA) and then copy their emails into
+    // Company.email so the auto-sender has fresh recipients to email.
+    runPostPdfPipeline(sourcePdfId)
+      .then(({ dotsRefreshed, emailsMigrated }) =>
+        console.log(
+          `[PDF Processor] Post-pipeline: ${dotsRefreshed} DOTs refreshed, ${emailsMigrated} emails migrated.`
+        )
+      )
+      .catch((err) => console.error("[PDF Processor] Post-pipeline failed:", err));
 
     // Fire-and-forget: generate clean PDFs + preview images in background
     prisma.company
