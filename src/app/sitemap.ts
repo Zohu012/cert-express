@@ -3,6 +3,8 @@ import { prisma } from "@/lib/db";
 
 const BASE = "https://www.certexpresss.com";
 
+export const revalidate = 3600;
+
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const now = new Date();
 
@@ -18,14 +20,17 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: `${BASE}/impressum`, lastModified: now, changeFrequency: "yearly", priority: 0.2 },
   ];
 
-  // One URL per successfully-scraped carrier.
-  // Google caps sitemap files at 50,000 URLs — if the dataset grows past that,
-  // switch to `generateSitemaps` (see node_modules/next/dist/docs/.../sitemap.md).
-  const carriers = await prisma.otruckingCompany.findMany({
-    where: { scrapeStatus: "success" },
-    select: { usdotNumber: true, updatedAt: true },
-    take: 45000,
-  });
+  // Only certified carriers — those with a Company row (~1,700 distinct DOTs).
+  // The 4.4M FMCSA-only carriers are internal lookup data and 404 publicly.
+  const carriers = await prisma.$queryRawUnsafe<
+    { usdotNumber: string; updatedAt: Date | null }[]
+  >(
+    `SELECT o."usdotNumber", o."updatedAt"
+     FROM "Company" c
+     INNER JOIN "OtruckingCompany" o ON o."usdotNumber" = c."usdotNumber"
+     WHERE o."scrapeStatus" = 'success'
+     GROUP BY o."usdotNumber"`
+  );
 
   const carrierEntries: MetadataRoute.Sitemap = carriers.map((c) => ({
     url: `${BASE}/companies/${encodeURIComponent(c.usdotNumber)}`,

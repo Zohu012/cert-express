@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { cache } from "react";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { PublicLayout } from "@/components/public-layout";
@@ -11,20 +12,28 @@ import {
   maskStreet,
 } from "@/lib/mask";
 
-export const dynamic = "force-dynamic";
+export const revalidate = 3600;
 export const dynamicParams = true;
 
 type PageProps = {
   params: Promise<{ usdotNumber: string }>;
 };
 
-async function fetchCompany(usdotNumber: string) {
+// React.cache dedupes within a single render so the page body and generateMetadata
+// share one DB call. Only certified carriers (those with a Company row) get a public
+// profile — others 404 even if they exist in the 4.4M-row OtruckingCompany table.
+const fetchCompany = cache(async (usdotNumber: string) => {
+  const certified = await prisma.company.findFirst({
+    where: { usdotNumber },
+    select: { id: true },
+  });
+  if (!certified) return null;
   const company = await prisma.otruckingCompany.findUnique({
     where: { usdotNumber },
   });
   if (!company || company.scrapeStatus !== "success") return null;
   return company;
-}
+});
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { usdotNumber } = await params;

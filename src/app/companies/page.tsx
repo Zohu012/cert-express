@@ -12,6 +12,8 @@ export const metadata: Metadata = {
   alternates: { canonical: "/companies" },
 };
 
+export const revalidate = 3600;
+
 const PAGE_SIZE = 50;
 
 export default async function CompaniesIndex({
@@ -24,24 +26,29 @@ export default async function CompaniesIndex({
   const q = (sp.q || "").trim();
 
   const offset = (pageNum - 1) * PAGE_SIZE;
+  // Drive the query from the small Company table (~1,700 rows) and join into the
+  // 4.4M-row OtruckingCompany via its unique usdotNumber index. GROUP BY collapses
+  // the duplicate rows that share a DOT (one Company row per certificate issued).
   const searchFilter = q ? `AND o."companyName" LIKE '%' || ? || '%'` : "";
   const params = q ? [q, PAGE_SIZE, offset] : [PAGE_SIZE, offset];
   const countParams = q ? [q] : [];
 
   const [countResult, rows] = await Promise.all([
     prisma.$queryRawUnsafe<{ total: number }[]>(
-      `SELECT count(*) as total FROM "OtruckingCompany" o
+      `SELECT count(DISTINCT c."usdotNumber") as total
+       FROM "Company" c
+       INNER JOIN "OtruckingCompany" o ON o."usdotNumber" = c."usdotNumber"
        WHERE o."scrapeStatus" = 'success'
-       AND EXISTS (SELECT 1 FROM "Company" c WHERE c."usdotNumber" = o."usdotNumber")
        ${searchFilter}`,
       ...countParams
     ),
     prisma.$queryRawUnsafe<{ id: string; usdotNumber: string; companyName: string | null; city: string | null; state: string | null; entityType: string | null; powerUnits: string | null; authorityStatus: string | null }[]>(
       `SELECT o."id", o."usdotNumber", o."companyName", o."city", o."state", o."entityType", o."powerUnits", o."authorityStatus"
-       FROM "OtruckingCompany" o
+       FROM "Company" c
+       INNER JOIN "OtruckingCompany" o ON o."usdotNumber" = c."usdotNumber"
        WHERE o."scrapeStatus" = 'success'
-       AND EXISTS (SELECT 1 FROM "Company" c WHERE c."usdotNumber" = o."usdotNumber")
        ${searchFilter}
+       GROUP BY o."usdotNumber"
        ORDER BY o."companyName" ASC
        LIMIT ? OFFSET ?`,
       ...params
