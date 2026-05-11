@@ -30,6 +30,19 @@ if (!globalForPrisma.prismaInit) {
     } catch (e) {
       console.error("[prisma] PRAGMA busy_timeout failed:", e);
     }
+    try {
+      // 256 MB SQLite page cache — large enough to hold hot indexes for the 4.4M-row
+      // OtruckingCompany table in memory, cutting query latency dramatically.
+      await prisma.$executeRawUnsafe("PRAGMA cache_size = -262144");
+    } catch (e) {
+      console.error("[prisma] PRAGMA cache_size failed:", e);
+    }
+    try {
+      // 512 MB mmap — lets SQLite read indexes via page cache instead of read() syscalls.
+      await prisma.$executeRawUnsafe("PRAGMA mmap_size = 536870912");
+    } catch (e) {
+      console.error("[prisma] PRAGMA mmap_size failed:", e);
+    }
   })();
 }
 
