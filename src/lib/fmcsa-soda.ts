@@ -301,7 +301,8 @@ export async function* fetchCarriersChangedSince(
   opts: { maxRows?: number; onPage?: PageOpts["onPage"] } = {}
 ): AsyncIterable<FmcsaMapped> {
   // mcs150_date is a text field shaped like "20260506 1125" — lexical >= works.
-  const where = `mcs150_date >= '${watermark}'`;
+  // Also include add_date so brand-new carriers with no MCS-150 filed yet are caught.
+  const where = `mcs150_date >= '${watermark}' OR add_date >= '${watermark}'`;
   for await (const row of paginate({ where, maxRows: opts.maxRows, onPage: opts.onPage })) {
     const mapped = mapFmcsaRow(row);
     if (mapped) yield mapped;

@@ -2,6 +2,7 @@ import cron from "node-cron";
 import { fetchDailyPdf } from "./pdf-fetcher";
 import { getSetting } from "./settings";
 import { runAutoSenderTick } from "./email-auto-sender";
+import { runFmcsaDeltaSync } from "./fmcsa-sync";
 
 export type CronTimeSlot = { hourUTC: number; minute: number; enabled: boolean };
 
@@ -76,6 +77,24 @@ export async function startCronJobs() {
   if (enabled.length === 0) {
     console.warn("[CRON] No enabled time slots — auto-fetch is off.");
   }
+
+  // Daily FMCSA delta sync at 3:00 AM Berlin time — watermark-based, only fetches
+  // carriers whose mcs150_date or add_date changed since the last run.
+  const fmcsaSyncTask = cron.schedule(
+    "0 3 * * *",
+    async () => {
+      console.log("[CRON] Starting FMCSA delta sync...");
+      try {
+        const { upserted, newWatermark } = await runFmcsaDeltaSync();
+        console.log(`[CRON] FMCSA sync done: ${upserted} upserted, watermark=${newWatermark}`);
+      } catch (err) {
+        console.error("[CRON] FMCSA sync failed:", err);
+      }
+    },
+    { timezone: "Europe/Berlin" }
+  );
+  activeTasks.push(fmcsaSyncTask);
+  console.log("[CRON] Scheduled: FMCSA delta sync at 03:00 Berlin time daily");
 
   // Auto-email sender tick — runs every 30 seconds; the tick itself is a no-op
   // when automation is disabled or outside the configured window.

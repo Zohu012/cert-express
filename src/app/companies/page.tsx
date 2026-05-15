@@ -49,7 +49,7 @@ export default async function CompaniesIndex({
        WHERE o."scrapeStatus" = 'success'
        ${searchFilter}
        GROUP BY o."usdotNumber"
-       ORDER BY o."companyName" ASC
+       ORDER BY MAX(c."createdAt") DESC
        LIMIT ? OFFSET ?`,
       ...params
     ),
