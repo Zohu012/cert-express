@@ -21,25 +21,14 @@ export function ScrapeTriggerButton() {
   const [status, setStatus] = useState<StatusPayload | null>(null);
   const [days, setDays] = useState<string>("30");
   const [resetting, setResetting] = useState(false);
-  const [scraping, setScraping] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const [message, setMessage] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
-
-  async function loadStatus() {
-    try {
-      const r = await fetch("/api/admin/otrucking/sync/status").catch(() => null);
-      if (!r) return;
-      // status route lives at /api/admin/otrucking/scrape/status
-    } catch {
-      // ignore
-    }
-  }
 
   useEffect(() => {
     fetch("/api/admin/otrucking/scrape/status")
       .then((r) => (r.ok ? r.json() : null))
       .then(setStatus)
       .catch(() => {});
-    loadStatus();
   }, []);
 
   async function handleReset() {
@@ -62,7 +51,6 @@ export function ScrapeTriggerButton() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
       setMessage({ kind: "ok", text: `Reset ${data.reset} row(s) older than ${n} day(s).` });
-      // refresh counts
       const s = await fetch("/api/admin/otrucking/scrape/status");
       if (s.ok) setStatus(await s.json());
     } catch (e) {
@@ -72,21 +60,24 @@ export function ScrapeTriggerButton() {
     }
   }
 
-  async function handleScrape() {
-    setScraping(true);
+  async function handleRefresh() {
+    if (!confirm("Re-fetch FMCSA data for all DOTs in the most recent PDF and migrate emails?")) return;
+    setRefreshing(true);
     setMessage(null);
     try {
-      const res = await fetch("/api/admin/otrucking/local-scrape", { method: "POST" });
+      const res = await fetch("/api/admin/otrucking/refresh-fmcsa", { method: "POST" });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
       setMessage({
         kind: "ok",
-        text: `Scrape started (pid ${data.pid}). Tail ${data.logFile} for progress.`,
+        text: `Refreshed ${data.dotsRefreshed} DOTs, migrated ${data.emailsMigrated} emails.`,
       });
+      const s = await fetch("/api/admin/otrucking/scrape/status");
+      if (s.ok) setStatus(await s.json());
     } catch (e) {
-      setMessage({ kind: "err", text: e instanceof Error ? e.message : "Scrape failed" });
+      setMessage({ kind: "err", text: e instanceof Error ? e.message : "Refresh failed" });
     } finally {
-      setScraping(false);
+      setRefreshing(false);
     }
   }
 
@@ -118,14 +109,14 @@ export function ScrapeTriggerButton() {
           disabled={resetting}
           className="rounded-lg bg-amber-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-amber-700 disabled:opacity-50"
         >
-          {resetting ? "Resetting..." : "Update (reset older)"}
+          {resetting ? "Resetting..." : "Reset older"}
         </button>
         <button
-          onClick={handleScrape}
-          disabled={scraping}
+          onClick={handleRefresh}
+          disabled={refreshing}
           className="rounded-lg bg-green-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50"
         >
-          {scraping ? "Starting..." : "Scrape"}
+          {refreshing ? "Refreshing..." : "Refresh from FMCSA"}
         </button>
       </div>
 
@@ -136,10 +127,10 @@ export function ScrapeTriggerButton() {
       )}
 
       <div className="text-xs text-gray-500 max-w-sm">
-        <span className="font-medium">Update:</span> flips successfully-scraped rows older than N
-        days back to <code>pending</code> so the next scrape refreshes them.{" "}
-        <span className="font-medium">Scrape:</span> spawns the local CLI (only works on a dev
-        server with Chrome on :9222).
+        <span className="font-medium">Reset older:</span> flips successfully-scraped rows older than N
+        days back to <code>pending</code>.{" "}
+        <span className="font-medium">Refresh from FMCSA:</span> re-fetches live carrier data for all
+        DOTs in the most recent PDF and migrates emails.
       </div>
     </div>
   );
