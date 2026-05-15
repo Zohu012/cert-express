@@ -19,6 +19,45 @@ function watermarkForDaysAgo(days: number): string {
   return `${yyyy}${mm}${dd}`;
 }
 
+async function runUpdate(since: string, days: number) {
+  console.log(`[update-recent] Starting FMCSA update since=${since} (last ${days} days)`);
+  let upserted = 0;
+  let batch: FmcsaMapped[] = [];
+
+  for await (const mapped of fetchCarriersChangedSince(since)) {
+    batch.push(mapped);
+    if (batch.length >= BATCH_SIZE) {
+      await prisma.$transaction(
+        batch.map(({ usdotNumber, sourceUrl, data }) =>
+          prisma.otruckingCompany.upsert({
+            where: { usdotNumber },
+            create: { usdotNumber, sourceUrl, ...data, scrapeStatus: "success", scrapeError: null, scrapedAt: new Date() },
+            update: { sourceUrl, ...data, scrapeStatus: "success", scrapeError: null, scrapedAt: new Date() },
+          })
+        )
+      );
+      upserted += batch.length;
+      console.log(`[update-recent] Upserted ${upserted} so far...`);
+      batch = [];
+    }
+  }
+
+  if (batch.length > 0) {
+    await prisma.$transaction(
+      batch.map(({ usdotNumber, sourceUrl, data }) =>
+        prisma.otruckingCompany.upsert({
+          where: { usdotNumber },
+          create: { usdotNumber, sourceUrl, ...data, scrapeStatus: "success", scrapeError: null, scrapedAt: new Date() },
+          update: { sourceUrl, ...data, scrapeStatus: "success", scrapeError: null, scrapedAt: new Date() },
+        })
+      )
+    );
+    upserted += batch.length;
+  }
+
+  console.log(`[update-recent] Done. Total upserted: ${upserted}`);
+}
+
 export async function POST(req: NextRequest) {
   const adminId = await verifySession();
   if (!adminId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -32,44 +71,11 @@ export async function POST(req: NextRequest) {
   const { days } = parsed.data;
   const since = watermarkForDaysAgo(days);
 
-  let upserted = 0;
-  let batch: FmcsaMapped[] = [];
+  // Fire-and-forget — returns immediately so the browser doesn't time out.
+  // Watch progress with: pm2 logs cert-express
+  runUpdate(since, days).catch((err) =>
+    console.error("[update-recent] Failed:", err)
+  );
 
-  try {
-    for await (const mapped of fetchCarriersChangedSince(since)) {
-      batch.push(mapped);
-      if (batch.length >= BATCH_SIZE) {
-        await prisma.$transaction(
-          batch.map(({ usdotNumber, sourceUrl, data }) =>
-            prisma.otruckingCompany.upsert({
-              where: { usdotNumber },
-              create: { usdotNumber, sourceUrl, ...data, scrapeStatus: "success", scrapeError: null, scrapedAt: new Date() },
-              update: { sourceUrl, ...data, scrapeStatus: "success", scrapeError: null, scrapedAt: new Date() },
-            })
-          )
-        );
-        upserted += batch.length;
-        batch = [];
-      }
-    }
-    if (batch.length > 0) {
-      await prisma.$transaction(
-        batch.map(({ usdotNumber, sourceUrl, data }) =>
-          prisma.otruckingCompany.upsert({
-            where: { usdotNumber },
-            create: { usdotNumber, sourceUrl, ...data, scrapeStatus: "success", scrapeError: null, scrapedAt: new Date() },
-            update: { sourceUrl, ...data, scrapeStatus: "success", scrapeError: null, scrapedAt: new Date() },
-          })
-        )
-      );
-      upserted += batch.length;
-    }
-  } catch (e) {
-    return NextResponse.json(
-      { error: e instanceof Error ? e.message : "FMCSA fetch failed" },
-      { status: 500 }
-    );
-  }
-
-  return NextResponse.json({ upserted, since, days });
+  return NextResponse.json({ started: true, since, days });
 }

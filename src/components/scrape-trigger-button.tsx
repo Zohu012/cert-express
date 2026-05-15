@@ -48,7 +48,7 @@ export function ScrapeTriggerButton() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
-      setMessage({ kind: "ok", text: `Updated ${data.upserted} carrier(s) with MCS-150 date since ${data.since}.` });
+      setMessage({ kind: "ok", text: `Update started for last ${data.days} day(s) since ${data.since}. Watch pm2 logs for progress.` });
       const s = await fetch("/api/admin/otrucking/scrape/status");
       if (s.ok) setStatus(await s.json());
     } catch (e) {
