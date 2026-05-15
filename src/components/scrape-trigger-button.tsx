@@ -19,8 +19,8 @@ function relativeTime(iso: string | null): string {
 
 export function ScrapeTriggerButton() {
   const [status, setStatus] = useState<StatusPayload | null>(null);
-  const [days, setDays] = useState<string>("30");
-  const [resetting, setResetting] = useState(false);
+  const [days, setDays] = useState<string>("7");
+  const [updating, setUpdating] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [message, setMessage] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
 
@@ -31,32 +31,30 @@ export function ScrapeTriggerButton() {
       .catch(() => {});
   }, []);
 
-  async function handleReset() {
+  async function handleUpdateLast() {
     const n = Number(days);
-    if (!Number.isFinite(n) || n < 0) {
-      setMessage({ kind: "err", text: "Enter a non-negative number of days." });
+    if (!Number.isFinite(n) || n < 1) {
+      setMessage({ kind: "err", text: "Enter a positive number of days." });
       return;
     }
-    if (!confirm(`Reset all successfully-scraped rows older than ${n} day(s) back to pending?`)) {
-      return;
-    }
-    setResetting(true);
+    if (!confirm(`Fetch FMCSA data for carriers updated in the last ${n} day(s)?`)) return;
+    setUpdating(true);
     setMessage(null);
     try {
-      const res = await fetch("/api/admin/otrucking/reset", {
+      const res = await fetch("/api/admin/otrucking/update-recent", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ olderThanDays: n }),
+        body: JSON.stringify({ days: n }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
-      setMessage({ kind: "ok", text: `Reset ${data.reset} row(s) older than ${n} day(s).` });
+      setMessage({ kind: "ok", text: `Updated ${data.upserted} carrier(s) with MCS-150 date since ${data.since}.` });
       const s = await fetch("/api/admin/otrucking/scrape/status");
       if (s.ok) setStatus(await s.json());
     } catch (e) {
-      setMessage({ kind: "err", text: e instanceof Error ? e.message : "Reset failed" });
+      setMessage({ kind: "err", text: e instanceof Error ? e.message : "Update failed" });
     } finally {
-      setResetting(false);
+      setUpdating(false);
     }
   }
 
@@ -97,7 +95,8 @@ export function ScrapeTriggerButton() {
       <div className="flex items-center gap-2">
         <input
           type="number"
-          min={0}
+          min={1}
+          max={365}
           value={days}
           onChange={(e) => setDays(e.target.value)}
           className="w-20 rounded-lg border border-gray-300 px-2 py-1 text-sm"
@@ -105,11 +104,11 @@ export function ScrapeTriggerButton() {
         />
         <span className="text-xs text-gray-500">days</span>
         <button
-          onClick={handleReset}
-          disabled={resetting}
+          onClick={handleUpdateLast}
+          disabled={updating}
           className="rounded-lg bg-amber-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-amber-700 disabled:opacity-50"
         >
-          {resetting ? "Resetting..." : "Reset older"}
+          {updating ? "Updating..." : "Update Last"}
         </button>
         <button
           onClick={handleRefresh}
@@ -127,10 +126,10 @@ export function ScrapeTriggerButton() {
       )}
 
       <div className="text-xs text-gray-500 max-w-sm">
-        <span className="font-medium">Reset older:</span> flips successfully-scraped rows older than N
-        days back to <code>pending</code>.{" "}
-        <span className="font-medium">Refresh from FMCSA:</span> re-fetches live carrier data for all
-        DOTs in the most recent PDF and migrates emails.
+        <span className="font-medium">Update Last:</span> fetches carriers from FMCSA whose MCS-150
+        date is within the last N days and upserts them.{" "}
+        <span className="font-medium">Refresh from FMCSA:</span> re-fetches DOTs from the most
+        recent PDF and migrates emails.
       </div>
     </div>
   );
