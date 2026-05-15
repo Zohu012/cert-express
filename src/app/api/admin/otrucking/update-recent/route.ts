@@ -5,7 +5,7 @@ import { prisma } from "@/lib/db";
 import { fetchCarriersChangedSince, type FmcsaMapped } from "@/lib/fmcsa-soda";
 
 const bodySchema = z.object({
-  days: z.number().int().min(1).max(365).default(7),
+  days: z.number().int().min(0).max(365).default(7),
 });
 
 const BATCH_SIZE = 1000;

@@ -33,8 +33,8 @@ export function ScrapeTriggerButton() {
 
   async function handleUpdateLast() {
     const n = Number(days);
-    if (!Number.isFinite(n) || n < 1) {
-      setMessage({ kind: "err", text: "Enter a positive number of days." });
+    if (!Number.isFinite(n) || n < 0) {
+      setMessage({ kind: "err", text: "Enter 0 or more days." });
       return;
     }
     if (!confirm(`Fetch FMCSA data for carriers updated in the last ${n} day(s)?`)) return;
@@ -95,7 +95,7 @@ export function ScrapeTriggerButton() {
       <div className="flex items-center gap-2">
         <input
           type="number"
-          min={1}
+          min={0}
           max={365}
           value={days}
           onChange={(e) => setDays(e.target.value)}
