@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Card } from "@/components/ui/card";
 import { EmailCampaignTable } from "@/components/email-campaign-table";
+import { BulkExcludeDateRange } from "@/components/bulk-exclude-date-range";
 import { verifySession } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { fetchEligibleCompanies } from "@/lib/email-automation";
@@ -132,6 +133,12 @@ export default async function EmailsPage({
           </Link>
         </div>
       </div>
+
+      {total > 0 && (
+        <div className="mb-4">
+          <BulkExcludeDateRange />
+        </div>
+      )}
 
       {byServiceDate.length > 0 && (
         <div className="mb-4 rounded-xl border border-gray-200 bg-white overflow-hidden">
